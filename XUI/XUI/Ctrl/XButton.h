@@ -20,15 +20,15 @@ public:
 	END_FRAME_MSG_MAP()
 
 public:
-	BOOL Create( CXFrame * pFrameParent, const CRect & rc = CRect(0, 0, 0, 0), BOOL bVisible = FALSE,
-		BOOL bDisabled = FALSE, IXImage *pBackground = NULL,
-		WIDTH_MODE aWidthMode = WIDTH_MODE_NOT_CHANGE, HEIGHT_MODE aHeightMode = HEIGHT_MODE_NOT_CHANGE);
+	BOOL Create( CXFrame * pFrameParent, LayoutParam * pLayout,  VISIBILITY visibility = VISIBILITY_NONE,
+		BOOL bDisabled = FALSE, IXImage *pBackground = NULL);
 
 public:
 	virtual VOID Destroy();
-
-protected:
-	virtual INT CalculateAdaptBackgroundWidth();
+	virtual BOOL OnMeasureWidth(const MeasureParam & param);
+	virtual BOOL OnMeasureHeight(const MeasureParam & param);
+	virtual BOOL OnLayout(const CRect & rcRect);
+	virtual IXImage * SetBackground(IXImage * pDrawBackground);
 
 public:
 	BOOL EnableButton(BOOL bEnable = TRUE);

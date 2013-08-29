@@ -28,9 +28,8 @@ class CXEdit :
 	END_FRAME_MSG_MAP()
 
 public:
-	BOOL Create(CXFrame * pFrameParent, const CRect & rcRect = CRect(0, 0, 0, 0), BOOL bVisible = FALSE,
-		BOOL bTransparent = FALSE, BOOL bMultiline = FALSE, BOOL bPasswordMode = FALSE,
-		WIDTH_MODE aWidthMode = WIDTH_MODE_NOT_CHANGE, HEIGHT_MODE aHeightMode = HEIGHT_MODE_NOT_CHANGE);
+	BOOL Create(CXFrame * pFrameParent, LayoutParam * pLayout, VISIBILITY visibility = VISIBILITY_NONE,
+		BOOL bTransparent = FALSE, BOOL bMultiline = FALSE, BOOL bPasswordMode = FALSE);
 	BOOL SetTransparent(BOOL b);
 	BOOL SetFont(LPCTSTR pFontName);
 	BOOL SetFontSize(UINT nPixel);
@@ -52,6 +51,7 @@ public:
 	CXEdit(void);
 
 public:
+	virtual BOOL SetRect(const CRect & rcNewFrameRect);
 	virtual BOOL ConfigFrameByXML(X_XML_NODE_TYPE xml);
 	virtual BOOL PaintForeground(HDC hDC, const CRect &rect);
 	virtual VOID Destroy();
@@ -60,7 +60,6 @@ public:
 protected:
 	virtual VOID OnDetachedFromParent();
 	virtual VOID OnAttachedToParent(CXFrame *pParent);
-	virtual VOID ChangeFrameRect(const CRect & rcNewFrameRect);
 
 public:
 	static const IID * GetITextServiceIID();

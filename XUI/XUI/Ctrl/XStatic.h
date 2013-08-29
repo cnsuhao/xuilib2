@@ -10,9 +10,12 @@ class CXStatic :
 	#pragma comment(linker, "/INCLUDE:?s_xml_runtime_info@CXStatic@@0VCXFrameXMLRuntime_CXStatic@1@A")
 
 public:
-	BOOL Create(CXFrame * pFrameParent, const CRect & rcRect = CRect(0, 0, 0, 0), BOOL bVisible = FALSE,
-		IXText *pText = NULL,
-		WIDTH_MODE aWidthMode = WIDTH_MODE_NOT_CHANGE, HEIGHT_MODE aHeightMode = HEIGHT_MODE_NOT_CHANGE);
+	BOOL Create(CXFrame * pFrameParent, LayoutParam * pLayout, VISIBILITY visibility = VISIBILITY_NONE,
+		IXText *pText = NULL);
+
+public:
+	virtual BOOL OnMeasureWidth(const MeasureParam & param);
+	virtual BOOL OnMeasureHeight(const MeasureParam & param);
 
 public:
 	CXStatic(void);
@@ -22,12 +25,12 @@ public:
 	CString GetText();
 
 public:
+	virtual BOOL SetRect(const CRect & rcNewFrameRect);
 	virtual BOOL PaintForeground(HDC hDC, const CRect &rect);
 	virtual VOID Destroy();
-
-protected:
-	virtual VOID ChangeFrameRect(const CRect & rcNewFrameRect);
+	
 
 private:
 	IXText *m_pText;
+	BOOL m_nMeasredHeight;
 };

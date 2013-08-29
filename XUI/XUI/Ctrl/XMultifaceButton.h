@@ -10,9 +10,8 @@ class CXMultifaceButton :
 public:
 	BOOL Create( CXFrame * pFrameParent, 
 		IXImage **pButtonFaces, UINT nButtonFaceCount,
-		const CRect & rc = CRect(0, 0, 0, 0), BOOL bVisible = FALSE,
-		UINT nStartButtonFace = 0, BOOL bDisabled = FALSE, 
-		WIDTH_MODE aWidthMode = WIDTH_MODE_NOT_CHANGE, HEIGHT_MODE aHeightMode = HEIGHT_MODE_NOT_CHANGE);
+		LayoutParam * pLayout,  VISIBILITY visibility = VISIBILITY_NONE,
+		UINT nStartButtonFace = 0, BOOL bDisabled = FALSE);
 
 public:
 	BOOL ChangeButtonFaceTo(UINT nButtonFaceIndex);

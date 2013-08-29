@@ -4,6 +4,7 @@
 
 #include "../Base/XResourceMgr.h"
 #include "XMultifaceButton.h"
+#include "../../../XLib/inc/interfaceS/string/StringCode.h"
 
 X_IMPLEMENT_FRAME_XML_RUNTIME(CXTree)
 
@@ -14,6 +15,17 @@ CXFrame * CXTree::CreateFrameFromXML(X_XML_NODE_TYPE xml, CXFrame *pParent)
 {
 	if (!xml)
 		return NULL;
+
+	LayoutParam *pLayout = pParent ?
+		pParent->GenerateLayoutParam(xml) : new CXFrame::LayoutParam(xml);
+	if (!pLayout)
+	{
+		CStringA strError;
+		strError.Format("WARNING: Generating the layout parameter for the parent %s failed. \
+						Building the frame failed. ", XLibST2A(pParent->GetName()));
+		CXFrameXMLFactory::ReportError(strError);
+		return NULL;
+	}
 
 	X_XML_ATTR_TYPE attr = NULL;
 
@@ -32,32 +44,46 @@ CXFrame * CXTree::CreateFrameFromXML(X_XML_NODE_TYPE xml, CXFrame *pParent)
 	pUnfoldedButtonFace = CXFrameXMLFactory::BuildImage(xml, "unfolded_button", "unfolded_button_type", "normal", "unfolded_button_part_");
 
 	CXTree *pFrame = new CXTree();
-	pFrame->Create(pParent, CXFrameXMLFactory::BuildRect(xml), FALSE,
-		bUnfolded, nChildItemIndent, pFoldedButtonFace, pUnfoldedButtonFace,
-		(CXFrame::WIDTH_MODE)CXFrameXMLFactory::GetWidthMode(xml), (CXFrame::HEIGHT_MODE)CXFrameXMLFactory::GetHeightMode(xml));
+	pFrame->Create(pParent, pLayout, VISIBILITY_NONE,
+		bUnfolded, nChildItemIndent, pFoldedButtonFace, pUnfoldedButtonFace);
 
 	return pFrame;
 }
 
 CXTree::CXTree(void)
 	: m_pRootItemFrameContainer(NULL),
-	m_pChildItemFrameContainer(NULL)
+	m_pChildItemFrameContainer(NULL),
+	m_nChildIndent(0)
 {
 }
 
-BOOL CXTree::Create( CXFrame * pFrameParent, const CRect & rcRect /*= CRect(0, 0, 0, 0)*/, BOOL bVisible /*= FALSE*/, 
-					BOOL bUnfolded /*= TRUE*/, UINT nChildIndent/*=20*/, IXImage *pFoldedButtonFace /*= NULL*/, IXImage *pUnfoldedButtonFace /*= NULL*/, 
-					WIDTH_MODE aWidthMode /*= WIDTH_MODE_NOT_CHANGE*/, HEIGHT_MODE aHeightMode /*= HEIGHT_MODE_NOT_CHANGE*/ )
+BOOL CXTree::Create( CXFrame * pFrameParent, LayoutParam * pLayout, VISIBILITY visibility /*= VISIBILITY_NONE*/, 
+					BOOL bUnfolded /*= TRUE*/, UINT nChildIndent/*=20*/, IXImage *pFoldedButtonFace /*= NULL*/, IXImage *pUnfoldedButtonFace /*= NULL*/)
 {
-	__super::Create(pFrameParent, DOCK_TOP2BOTTOM, ALIGN_LOW, rcRect, bVisible, aWidthMode, aHeightMode);
+	__super::Create(pFrameParent, CXDock::DOCK_TOP2BOTTOM, CXDock::ALIGN_LOW, pLayout, visibility);
+
+	LayoutParam *pRootItemFrameContainerLayout = GenerateLayoutParam();
+	if (!pRootItemFrameContainerLayout) {ATLASSERT(NULL); return FALSE;}
+	pRootItemFrameContainerLayout->m_mWidth = pRootItemFrameContainerLayout->m_mHeight 
+		= LayoutParam::METRIC_WRAP_CONTENT;
+
+ 	LayoutParam *pChildItemFrameContainerLayout = GenerateLayoutParam();
+ 	if (!pChildItemFrameContainerLayout) {ATLASSERT(NULL); return FALSE;}
+ 	pChildItemFrameContainerLayout->m_mWidth = pChildItemFrameContainerLayout->m_mHeight 
+ 		= LayoutParam::METRIC_WRAP_CONTENT;
+
+	LayoutParam *pFoldUnfoldButtonLayout = GenerateLayoutParam();
+	if (!pFoldUnfoldButtonLayout) {ATLASSERT(NULL); return FALSE;}
+	pFoldUnfoldButtonLayout->m_mWidth = pFoldUnfoldButtonLayout->m_mHeight 
+		= LayoutParam::METRIC_WRAP_CONTENT;
+	pFoldUnfoldButtonLayout->m_nMarginRight = FOLD_UNFOLD_BUTTON_MARGIN_RIGHT;
 
 	m_pRootItemFrameContainer = new CXDock();
-	m_pRootItemFrameContainer->Create(this, DOCK_LEFT2RIGHT, ALIGN_MIDDLE, 
-		CRect(0, 0, 0, 0), TRUE, WIDTH_MODE_WRAP_CONTENT, HEIGHT_MODE_WRAP_CONTENT);
+	m_pRootItemFrameContainer->Create(this, CXDock::DOCK_LEFT2RIGHT, CXDock::ALIGN_MIDDLE, 
+		pRootItemFrameContainerLayout, VISIBILITY_SHOW);
 	m_pChildItemFrameContainer = new CXDock();
-	m_pChildItemFrameContainer->Create(this, DOCK_TOP2BOTTOM, ALIGN_LOW,
-		CRect(0, 0, 0, 0), TRUE, WIDTH_MODE_WRAP_CONTENT, HEIGHT_MODE_WRAP_CONTENT);
-	m_pChildItemFrameContainer->AddEventListener(this);
+	m_pChildItemFrameContainer->Create(this, CXDock::DOCK_TOP2BOTTOM, CXDock::ALIGN_LOW,
+		pChildItemFrameContainerLayout, VISIBILITY_SHOW);
 
 	if (pFoldedButtonFace == NULL)
 		pFoldedButtonFace = CXResourceMgr::Instance().GetImage(_T("img/ctrl/folded_button.png"));
@@ -68,11 +94,8 @@ BOOL CXTree::Create( CXFrame * pFrameParent, const CRect & rcRect /*= CRect(0, 0
 
 	CXMultifaceButton *pFoldUnfoldButton = new CXMultifaceButton();
 	pFoldUnfoldButton->Create(m_pRootItemFrameContainer, pButtonFaces, 2, 
-		CRect(0, 0, 0, 0), TRUE,
-		bUnfolded ? 1 : 0, FALSE,
-		WIDTH_MODE_ADAPT_BACKGROUND, HEIGHT_MODE_ADAPT_BACKGROUND);
-
-	pFoldUnfoldButton->SetMargin(CRect(0, 0, FOLD_UNFOLD_BUTTON_MARGIN_RIGHT, 0));
+		pFoldUnfoldButtonLayout, VISIBILITY_SHOW,
+		bUnfolded ? 1 : 0, FALSE);
 
 	pFoldUnfoldButton->AddEventListener(this);
 
@@ -85,22 +108,19 @@ BOOL CXTree::Create( CXFrame * pFrameParent, const CRect & rcRect /*= CRect(0, 0
 
 BOOL CXTree::SetUnfold( BOOL bUnfold )
 {
-	if (!m_pChildItemFrameContainer)
-		return FALSE;
-
-	if (bUnfold && m_pChildItemFrameContainer->IsVisible() && m_pChildItemFrameContainer->IsHoldPlace())
-		return TRUE;
-	if (!bUnfold && !m_pChildItemFrameContainer->IsVisible() && !m_pChildItemFrameContainer->IsHoldPlace())
-		return TRUE;
-
-	m_pChildItemFrameContainer->SetVisible(bUnfold);
-	m_pChildItemFrameContainer->SetHoldPlace(bUnfold);
-
-	CXMultifaceButton *pFoldUnfoldButton = NULL;
-	if (m_pRootItemFrameContainer && (pFoldUnfoldButton = (CXMultifaceButton *)m_pRootItemFrameContainer->GetFrameByIndex(0)))
-		pFoldUnfoldButton->ChangeButtonFaceTo(bUnfold ? 1 : 0);
-
-	InvalidateLines();
+ 	if (!m_pChildItemFrameContainer)
+ 		return FALSE;
+ 
+ 	if (bUnfold && m_pChildItemFrameContainer->GetVisibility() == VISIBILITY_SHOW)
+ 		return TRUE;
+ 	if (!bUnfold && m_pChildItemFrameContainer->GetVisibility() == VISIBILITY_NONE)
+ 		return TRUE;
+ 
+ 	m_pChildItemFrameContainer->SetVisibility(bUnfold ? VISIBILITY_SHOW : VISIBILITY_NONE);
+ 
+ 	CXMultifaceButton *pFoldUnfoldButton = NULL;
+ 	if (m_pRootItemFrameContainer && (pFoldUnfoldButton = (CXMultifaceButton *)m_pRootItemFrameContainer->GetFrameByIndex(0)))
+ 		pFoldUnfoldButton->ChangeButtonFaceTo(bUnfold ? 1 : 0);
 
 	return TRUE;
 }
@@ -110,26 +130,17 @@ BOOL CXTree::IsUnfold()
 	if (!m_pChildItemFrameContainer)
 		return FALSE;
 
-	if (m_pChildItemFrameContainer->IsVisible() && m_pChildItemFrameContainer->IsHoldPlace())
-		return TRUE;
-
-	return FALSE;
+	return m_pChildItemFrameContainer->GetVisibility() == VISIBILITY_SHOW;
 }
 
 BOOL CXTree::SetChildItemIndent( UINT nIndent )
 {
-	if (!m_pRootItemFrameContainer || !m_pChildItemFrameContainer)
-		return FALSE;
-	CXFrame *pFoldUnfoldButton = m_pRootItemFrameContainer->GetFrameByIndex(0);
-	if (!pFoldUnfoldButton)
-		return FALSE;
+	if (m_nChildIndent == nIndent)
+		return TRUE;
 
-	CRect rcChildItemFrameContainerMargin(m_pChildItemFrameContainer->GetMargin());
-	rcChildItemFrameContainerMargin.left = 
-		pFoldUnfoldButton->GetRect().right + pFoldUnfoldButton->GetMargin().right + m_pRootItemFrameContainer->GetRect().left +
-		nIndent;
+	m_nChildIndent = nIndent;
 
-	m_pChildItemFrameContainer->SetMargin(rcChildItemFrameContainerMargin);
+	UpdateLeftMarginOfChildItemContainer();
 
 	return TRUE;
 }
@@ -185,25 +196,41 @@ BOOL CXTree::HandleXMLChildNodes( X_XML_NODE_TYPE xml )
 {
 	BOOL bFirstChild = TRUE;
 
+	if (!m_pRootItemFrameContainer)
+	{
+		ATLASSERT(NULL);
+		return FALSE;
+	}
+
+	if (!m_pChildItemFrameContainer)
+	{
+		ATLASSERT(NULL);
+		return FALSE;
+	}
+
 	for (X_XML_NODE_TYPE child = xml->first_node();
 		child; child = child->next_sibling())
 	{
 		if (child->type() != X_XML_NODE_CATEGORY_TYPE::node_element)
 			continue;
 		
-		CXFrame *pFrame = 
-			CXFrameXMLFactory::Instance().BuildFrame(child, NULL);
-
-		if (!pFrame)
-			continue;
-
 		if (bFirstChild)
 		{
-			delete SetRootItemFrame(pFrame);
+			delete SetRootItemFrame(NULL);
+
+			CXFrame *pChild = 
+				CXFrameXMLFactory::Instance().BuildFrame(child, m_pRootItemFrameContainer);
+
+			if (!pChild)
+				continue;
+
 			bFirstChild = FALSE;
 		}
 		else
-			AddChildItemFrame(pFrame);
+		{
+			CXFrame *pChild = 
+				CXFrameXMLFactory::Instance().BuildFrame(child, m_pChildItemFrameContainer);
+		}
 	}
 
 	return TRUE;
@@ -213,6 +240,7 @@ VOID CXTree::OnFoldUnfoldButtonClicked( CXFrame *pSrcFrame, UINT uEvent, WPARAM 
 {
  	if (!m_pRootItemFrameContainer)
  		return;
+
  	CXFrame *pFoldUnfoldButton = m_pRootItemFrameContainer->GetFrameByIndex(0);
  	if (!pFoldUnfoldButton)
  		return;
@@ -305,26 +333,6 @@ VOID CXTree::InvalidateLines()
 	InvalidateRect(rcInvalid);
 }
 
-VOID CXTree::OnChildItemFrameRedock( CXFrame *pSrcFrame, UINT uEvent, WPARAM wParam, LPARAM lParam, BOOL& bHandled )
-{
-	CRect rcInvalid(ParentToChild(GetRect()));
-
-	if (m_pRootItemFrameContainer)
-		rcInvalid.top = max(rcInvalid.top, m_pRootItemFrameContainer->GetRect().top);
-	if (m_pChildItemFrameContainer)
-	{
-		CRect rcChildItemFrameContainer(m_pChildItemFrameContainer->GetRect());
-		rcInvalid.right = min(rcInvalid.right, rcChildItemFrameContainer.left);
-		rcInvalid.bottom = min(rcInvalid.bottom, rcChildItemFrameContainer.bottom);
-
-		CXFrame *pFrame = m_pChildItemFrameContainer->GetFrameByIndex(wParam);
-		if (pFrame)
-			rcInvalid.top = max(rcInvalid.top, pFrame->GetRect().top + rcChildItemFrameContainer.top);
-	}
-
-	InvalidateRect(rcInvalid);
-}
-
 INT CXTree::GetVCenter()
 {
 	CXFrame *pFoldUnfoldButton = NULL;
@@ -341,5 +349,86 @@ VOID CXTree::Destroy()
 {
 	m_pRootItemFrameContainer = m_pChildItemFrameContainer = NULL;
 
+	m_nChildIndent = 0;
+
 	__super::Destroy();
+}
+
+VOID CXTree::OnFoldUnfoldButtonFrameChanged( CXFrame *pSrcFrame, UINT uEvent, 
+											WPARAM wParam, LPARAM lParam, BOOL& bHandled )
+{
+	if (!m_pRootItemFrameContainer)
+ 		return;
+
+ 	CXFrame *pFoldUnfoldButton = m_pRootItemFrameContainer->GetFrameByIndex(0);
+ 	if (!pFoldUnfoldButton)
+ 		return;
+ 
+ 	if (pSrcFrame != pFoldUnfoldButton)
+ 		return;
+
+	const CRect &rcOld = *(CRect *)wParam;
+	const CRect &rcNew = *(CRect *)lParam;
+
+	if (rcOld.right == rcNew.right)
+		return;
+
+	UpdateLeftMarginOfChildItemContainer();
+}
+
+
+VOID CXTree::OnRootFrameRectChanged( CXFrame *pSrcFrame, UINT uEvent, 
+									WPARAM wParam, LPARAM lParam, BOOL& bHandled )
+{
+	const CRect &rcOld = *(CRect *)wParam;
+	const CRect &rcNew = *(CRect *)lParam;
+
+	if (rcOld.left == rcNew.left)
+		return;
+
+	UpdateLeftMarginOfChildItemContainer();
+}
+
+VOID CXTree::UpdateLeftMarginOfChildItemContainer()
+{
+	ATLASSERT(m_pRootItemFrameContainer && m_pChildItemFrameContainer);
+
+	int nChildMarginLeft = m_nChildIndent;
+
+	if (m_pRootItemFrameContainer)
+	{
+		nChildMarginLeft += m_pRootItemFrameContainer->GetRect().left;
+		CXFrame * pFoldUnfoldButton = NULL;
+		if (pFoldUnfoldButton = m_pRootItemFrameContainer->GetFrameByIndex(0))
+		{
+			nChildMarginLeft += pFoldUnfoldButton->GetRect().right;
+
+			LayoutParam *pLayoutParamOfButton = pFoldUnfoldButton->GetLayoutParam();
+			ATLASSERT(pLayoutParamOfButton);
+			if (pLayoutParamOfButton)
+				nChildMarginLeft += pLayoutParamOfButton->m_nMarginRight;
+		}
+	}
+
+	if (m_pChildItemFrameContainer)
+	{
+		LayoutParam *pLayoutParam = m_pChildItemFrameContainer->BeginUpdateLayoutParam();
+		ATLASSERT(pLayoutParam);
+		if (pLayoutParam)
+		{
+			pLayoutParam->m_nMarginLeft = nChildMarginLeft;
+			m_pChildItemFrameContainer->EndUpdateLayoutParam();
+		}
+	}
+}
+
+BOOL CXTree::OnLayout( const CRect & rcRect )
+{
+	InvalidateLines();
+
+	BOOL bRtn = __super::OnLayout(rcRect);
+
+	InvalidateLines();
+
+	return bRtn;
 }

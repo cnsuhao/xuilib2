@@ -2,6 +2,7 @@
 
 #include "XWindow.h"
 #include "../../../XLib/inc/interfaceS/string/StringCode.h"
+#include "XMessageService.h"
 
 X_IMPLEMENT_FRAME_XML_RUNTIME(CXWindow)
 
@@ -13,8 +14,6 @@ CXFrame * CXWindow::CreateFrameFromXML(X_XML_NODE_TYPE xml, CXFrame *pParent)
 		return NULL;
 
 	ATLASSERT(!pParent);
-
-	CXWindow *pFrame = new CXWindow();
 																						
 	CRect rcFrame(0, 0, 0, 0);
 	CString strWndName(_T("XUI´°¿Ú"));
@@ -31,9 +30,19 @@ CXFrame * CXWindow::CreateFrameFromXML(X_XML_NODE_TYPE xml, CXFrame *pParent)
 #endif
 	}
 
-	pFrame->Create(NULL, CXFrameXMLFactory::BuildRect(xml), 
-		(CXFrame::WIDTH_MODE)CXFrameXMLFactory::GetWidthMode(xml), (CXFrame::HEIGHT_MODE)CXFrameXMLFactory::GetHeightMode(xml), 
-		strWndName, 0);
+	LayoutParam *pLayout = pParent ?
+		pParent->GenerateLayoutParam(xml) : new CXFrame::LayoutParam(xml);
+	if (!pLayout)
+	{
+		CStringA strError;
+		strError.Format("WARNING: Generating the layout parameter for the parent %s failed. \
+			Building the frame failed. ", XLibST2A(pParent->GetName()));
+		CXFrameXMLFactory::ReportError(strError);
+		return NULL;
+	}
+
+	CXWindow *pFrame = new CXWindow();
+	pFrame->Create(NULL, pLayout, strWndName, 0);
 
 	return pFrame;
 }
@@ -42,6 +51,8 @@ CXWindow::CXWindow(void)
 	: m_dcBuffer(NULL),
 	m_dcBufferForDirectDraw(NULL),
 	m_hBufferOldBmp(NULL),
+	m_bLayoutScheduled(FALSE),
+	m_bIsLayouting(FALSE),
 	m_bUpdateScheduled(FALSE),
 	m_cAlpha(255),
 	m_FrameMsgMgr(this),
@@ -64,9 +75,15 @@ ATL::CWndClassInfo  CXWindow::GetWndClassInfo()
 	return wc; 
 }
 
-HWND CXWindow::Create(HWND hWndParent, _U_RECT rect, WIDTH_MODE aWidthMode, HEIGHT_MODE aHeightMode, 
+HWND CXWindow::Create(HWND hWndParent, LayoutParam * pLayout, 
 					  LPCTSTR szWindowName, DWORD dwStyle, DWORD dwExStyle, _U_MENUorID MenuOrID, LPVOID lpCreateParam)
 {
+	if (!pLayout) 
+	{
+		ATLASSERT(!_T("No layout parameter. "));
+		return NULL;
+	}
+
 	ATOM atom = GetWndClassInfo().Register(&m_pfnSuperWindowProc);
 	if (szWindowName == NULL)
 		szWindowName = GetWndCaption();
@@ -81,7 +98,7 @@ HWND CXWindow::Create(HWND hWndParent, _U_RECT rect, WIDTH_MODE aWidthMode, HEIG
 		Create(hWndParent, CRect(0, 0, 0, 0), szWindowName, dwStyle, dwExStyle, MenuOrID, atom, lpCreateParam);
 
 	if (hWnd)
-		__super::Create(NULL, rect.m_lpRect ? *rect.m_lpRect : CRect(0, 0, 0, 0), bVisible, aWidthMode, aHeightMode);
+		__super::Create(NULL, pLayout, bVisible ? VISIBILITY_SHOW : VISIBILITY_NONE);
 
 	return hWnd;
 }
@@ -102,7 +119,8 @@ LRESULT CXWindow::OnSize(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled
 	GetWindowRect(&rcWnd);
 
 	ReleaseBufferDC();
-	__super::ChangeFrameRect(rcWnd);
+	__super::SetRect(rcWnd);
+	RequestLayout();
 
 	if (m_bCaptionWidthReachParent || m_bCaptionHeightReachParnet)
 		RefreashCaptionRect();
@@ -112,7 +130,7 @@ LRESULT CXWindow::OnSize(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled
 
 LRESULT CXWindow::OnShowWindow( UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled )
 {
-	__super::SetVisible(wParam);
+	__super::SetVisibility(wParam ? VISIBILITY_SHOW : VISIBILITY_NONE);
 	return 0;
 }
 
@@ -242,16 +260,18 @@ BOOL CXWindow::UpdateLayeredWindow(HDC dcSrc)
 }
 
 
-BOOL CXWindow::SetVisible( BOOL bVisible )
+BOOL CXWindow::SetVisibility( VISIBILITY visibility )
 {
-	if ((IsVisible() && bVisible) ||
-		(!IsVisible() && !bVisible))
+	if (visibility == VISIBILITY_HIDE)
+		visibility = VISIBILITY_NONE;
+
+	if (GetVisibility() == visibility)
 		return TRUE;
 
 	if (IsWindow())
-		ShowWindow( bVisible ? SW_SHOW : SW_HIDE );
+		ShowWindow( visibility == VISIBILITY_SHOW ? SW_SHOW : SW_HIDE );
 	else
-		__super::SetVisible(bVisible);
+		__super::SetVisibility(visibility);
 
 	return TRUE;
 }
@@ -487,7 +507,7 @@ LRESULT CXWindow::OnMove( UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandle
 	CRect rcWnd(0, 0, 0, 0);
 	GetWindowRect(&rcWnd);
 
-	__super::ChangeFrameRect(rcWnd);
+	__super::SetRect(rcWnd);
 
 	ThrowEvent(EVENT_WND_MOVED, wParam, 0);
 	return 0;
@@ -518,6 +538,10 @@ BOOL CXWindow::ConfigFrameByXML( X_XML_NODE_TYPE xml )
 
 VOID CXWindow::Destroy()
 {
+	m_bLayoutScheduled = FALSE;
+	m_bIsLayouting = FALSE;
+	m_bUpdateScheduled = FALSE;
+
 	__super::Destroy();
 
 	if(IsWindow())
@@ -554,10 +578,44 @@ LRESULT CXWindow::OnEnable( UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHand
 	return 0;
 }
 
+LRESULT CXWindow::OnXLayout( UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled )
+{
+	if (!m_bLayoutScheduled)
+		return -1;
+
+	m_bLayoutScheduled = FALSE;
+
+	m_bIsLayouting = TRUE;
+
+	CRect rc(GetRect());
+
+	MeasureParam param;
+	param.m_Spec = MeasureParam::MEASURE_EXACT;
+	
+	param.m_nNum = rc.Width();
+	OnMeasureWidth(param);
+	param.m_nNum = rc.Height();
+	OnMeasureHeight(param);
+
+	OnLayout(rc);
+
+	m_bIsLayouting = FALSE;
+
+	return 0;
+}
+
+
 LRESULT CXWindow::OnXUpdate( UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled )
 {
 	if (!m_bUpdateScheduled)
 		return -1;
+
+	if (m_bLayoutScheduled || 
+		CXMessageService::Instance().HasPendingMsg(WM_DELAY_UPDATE_LAYOUT_PARAM))
+	{
+		PostMessage(WM_X_UPDATE);
+		return -1;
+	}
 
 	m_bUpdateScheduled = FALSE;
 
@@ -624,18 +682,6 @@ LRESULT CXWindow::OnXUpdate( UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHan
 	return 0;
 }
 
-BOOL CXWindow::SetWidthHeightMode( WIDTH_MODE aWidthMode, HEIGHT_MODE aHeightMode )
-{
-	if (aWidthMode == WIDTH_MODE_REACH_PARENT)
-		aWidthMode = WIDTH_MODE_NOT_CHANGE;
-
-	if (aHeightMode == HEIGHT_MODE_REACH_PARENT)
-		aHeightMode = HEIGHT_MODE_NOT_CHANGE;
-
-	return __super::SetWidthHeightMode(aWidthMode, aHeightMode);
-
-}
-
 VOID CXWindow::RefreashCaptionRect()
 {
 	if (!m_bCaptionWidthReachParent && !m_bCaptionHeightReachParnet)
@@ -670,15 +716,18 @@ BOOL CXWindow::SetCaptionHeightReachWnd( BOOL b )
 	return TRUE;
 }
 
-VOID CXWindow::ChangeFrameRect( const CRect & rcNewFrameRect )
+BOOL CXWindow::SetRect( const CRect & rcNewFrameRect )
 {
 	if (GetRect() == rcNewFrameRect)
-		return;
+		return TRUE;
 
 	if (IsWindow())
-		MoveWindow(&rcNewFrameRect, FALSE);
+		return MoveWindow(&rcNewFrameRect, FALSE);
 	else
-		__super::ChangeFrameRect(rcNewFrameRect);
+	{
+		return __super::SetRect(rcNewFrameRect);
+		RequestLayout();
+	}
 }
 
 CPoint CXWindow::FrameToWindow( const CPoint &pt )
@@ -701,12 +750,44 @@ HDC CXWindow::GetDC()
 	return m_dcBufferForDirectDraw;
 }
 
-BOOL CXWindow::ReleaseDC( HDC dc )
+BOOL CXWindow::ReleaseDC( HDC dc, BOOL bUpdate /*= TRUE*/ )
 {
 	ATLASSERT(dc == m_dcBufferForDirectDraw);
 
-	if (IsWindow())
+	if (bUpdate && IsWindow())
 		UpdateLayeredWindow(m_dcBufferForDirectDraw);
 
 	return TRUE;
+}
+
+BOOL CXWindow::EndUpdateLayoutParam()
+{
+	LayoutParam *pLayout = GetLayoutParam();
+	if (!pLayout)
+		return FALSE;
+
+	CRect rc(pLayout->m_nX, pLayout->m_nY,
+		pLayout->m_nX + max(0, pLayout->m_nWidth),
+		pLayout->m_nY + max(0, pLayout->m_nHeight));
+
+	SetRect(rc);
+
+	return TRUE;
+}
+
+BOOL CXWindow::RequestLayout()
+{
+	if (m_bLayoutScheduled)
+		return TRUE;
+
+	m_bLayoutScheduled = TRUE;
+
+	PostMessage(WM_X_LAYOUT);
+
+	return TRUE;
+}
+
+BOOL CXWindow::IsLayouting()
+{
+	return m_bIsLayouting;
 }

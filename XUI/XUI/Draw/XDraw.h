@@ -15,7 +15,11 @@ public:
 class IXText : public IXDraw
 {
 public:
+	enum { UNLIMIT = -1 };
+
+public:
 	virtual CString GetText() = 0;
+	virtual CSize Measure(HDC dc, INT nWidthLimit = UNLIMIT) = 0;
 };
 
 class IXImage : public IXDraw

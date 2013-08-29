@@ -10,9 +10,8 @@ BEGIN_FRAME_MSG_MAP(CXCaret)
 END_FRAME_MSG_MAP()
 
 public:
-	BOOL Create(CXFrame * pFrameParent, const CRect & rcRect = CRect(0, 0, 0, 0), BOOL bVisible = FALSE,
-		UINT nBlinkTime = 500,
-		WIDTH_MODE aWidthMode = WIDTH_MODE_NOT_CHANGE, HEIGHT_MODE aHeightMode = HEIGHT_MODE_NOT_CHANGE);
+	BOOL Create(CXFrame * pFrameParent,  LayoutParam *pLayout,  VISIBILITY visibility = VISIBILITY_NONE,
+		UINT nBlinkTime = 500);
 	// Conforms to the windows API CreateCaret.
 	// See http://msdn.microsoft.com/zh-cn/library/windows/desktop/ms648399(v=vs.85).aspx
 	BOOL SetCaretShape(HBITMAP hBitmap, int nWidth, int nHeight);
@@ -24,9 +23,7 @@ public:
 public:
 	virtual BOOL PaintForeground(HDC hDC, const CRect &rect);
 	virtual VOID Destroy();
-
-protected:
-	virtual VOID ChangeFrameRect(const CRect & rcNewFrameRect);
+	
 
 public:
 	CXCaret(void);

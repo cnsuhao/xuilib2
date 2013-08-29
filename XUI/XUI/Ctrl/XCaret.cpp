@@ -77,24 +77,18 @@ BOOL CXCaret::SetCaretShape( HBITMAP hBitmap, int nWidth, int nHeight )
 	else
 		m_hBitmap = hBitmap;
 
-	CRect rcFrame(GetRect());
-	SetRect(CRect(rcFrame.left, rcFrame.top, rcFrame.left + nWidth, rcFrame.top + nHeight));
+	LayoutParam *pLayoutPram = BeginUpdateLayoutParam();
+	ATLASSERT(pLayoutPram);
+	if (pLayoutPram)
+	{
+		pLayoutPram->m_nWidth = nWidth;
+		pLayoutPram->m_nHeight = nHeight;
+		EndUpdateLayoutParam();
+	}
 
 	InvalidateRect();
 
 	return TRUE;
-}
-
-VOID CXCaret::ChangeFrameRect( const CRect & rcNewFrameRect )
-{
-	if (GetRect() == rcNewFrameRect)
-		return;
-
-	if (m_hBitmap != 0 && m_hBitmap != (HBITMAP)1 &&
-		(rcNewFrameRect.Width() != m_nBitmapWidth || rcNewFrameRect.Height() != m_nBitmapHeight))
-		return;
-
-	__super::ChangeFrameRect(rcNewFrameRect);
 }
 
 LRESULT CXCaret::OnTimer( UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled, BOOL& bCancelBabble )
@@ -165,14 +159,19 @@ BOOL CXCaret::PaintForeground( HDC hDC, const CRect &rcUpdate )
 
 	}
 
-	return __super::PaintBackground(hDC, rcUpdate);
+	return __super::PaintForeground(hDC, rcUpdate);
 }
 
-BOOL CXCaret::Create( CXFrame * pFrameParent, const CRect & rcRect /*= CRect(0, 0, 0, 0)*/, BOOL bVisible /*= FALSE*/, 
-					 UINT nBlinkTime /*= 500*/, 
-					 WIDTH_MODE aWidthMode /*= WIDTH_MODE_NOT_CHANGE*/, HEIGHT_MODE aHeightMode /*= HEIGHT_MODE_NOT_CHANGE*/ )
+BOOL CXCaret::Create( CXFrame * pFrameParent, LayoutParam *pLayout,  VISIBILITY visibility/* = VISIBILITY_NONE*/, 
+					 UINT nBlinkTime /*= 500*/)
 {
-	BOOL bRtn = __super::Create(pFrameParent, rcRect, bVisible, aWidthMode, aHeightMode);
+	if (!pLayout) 
+	{
+		ATLASSERT(!_T("No layout parameter. "));
+		return FALSE;
+	}
+
+	BOOL bRtn = __super::Create(pFrameParent, pLayout, visibility);
 
 	SetCaretBlinkTime(nBlinkTime);
 

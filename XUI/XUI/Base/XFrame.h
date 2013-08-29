@@ -13,6 +13,8 @@
 
 #define INVALID_FRAME_INDEX ((UINT)-1)
 
+#define WM_DELAY_UPDATE_LAYOUT_PARAM (WM_USER + 0x120)
+
 class CXFrame :
 	public IXFrameEventListener,
 	SUPPORT_REMOTE_REFERENCE
@@ -21,10 +23,6 @@ class CXFrame :
 	#pragma comment(linker, "/INCLUDE:?s_xml_runtime_info@CXFrame@@0VCXFrameXMLRuntime_CXFrame@1@A")
 
 	BEGIN_FRAME_EVENT_MAP(CXFrame)
-		FRAME_EVENT_FRAME_HANDLER(EVENT_FRAME_RECT_CHANGED, m_pFrameParent, OnParentRectChanged)
-		FRAME_EVENT_HANDLER(EVENT_FRAME_RECT_CHANGED, OnChildRectChanged)
-		FRAME_EVENT_HANDLER(EVENT_FRAME_MARGIN_CHANGED, OnChildMarginChanged)
-		FRAME_EVENT_HANDLER(EVENT_FRAME_HOLDPLACE_STATE_CHANGED, OnChildHoldPlaceStateChanged)
 	END_FRAME_EVENT_MAP()
 
 	BEGIN_FRAME_MSG_MAP(CXFrame)
@@ -33,15 +31,77 @@ class CXFrame :
 		FRAME_MESSAGE_HANDLER(WM_LBUTTONUP, OnLButtonUp)
 		FRAME_MESSAGE_HANDLER(WM_MOUSELEAVE, OnMouseLeave)
 		FRAME_MESSAGE_HANDLER(WM_X_MOUSEENTER, OnMouseEnter)
+		FRAME_MESSAGE_HANDLER(WM_DELAY_UPDATE_LAYOUT_PARAM, OnDelayUpdateLayoutParam)
 	END_FRAME_MSG_MAP()
 
 public:
-	enum WIDTH_MODE	
-		{WIDTH_MODE_NORMAL = 0, WIDTH_MODE_REACH_PARENT, WIDTH_MODE_WRAP_CONTENT, WIDTH_MODE_ADAPT_BACKGROUND, 
-		WIDTH_MODE_NOT_CHANGE};
-	enum HEIGHT_MODE 
-		{HEIGHT_MODE_NORMAL = 0, HEIGHT_MODE_REACH_PARENT, HEIGHT_MODE_WRAP_CONTENT, HEIGHT_MODE_ADAPT_BACKGROUND, 
-		HEIGHT_MODE_NOT_CHANGE};
+	enum VISIBILITY 
+	{
+		VISIBILITY_NONE = -1,    // Do not hold place and invisible. 
+		VISIBILITY_HIDE = 0,     // Hold place but invisible. 
+		VISIBILITY_SHOW = 1		 // Hold place and visible. 
+	};
+
+public:
+	class LayoutParam
+	{
+	public:
+		enum SPECIAL_METRICS 
+			{ METRIC_REACH_PARENT = -1,  METRIC_WRAP_CONTENT = -2};
+	public:
+		INT m_nX, m_nY;
+		union
+		{
+			INT					m_nWidth;
+			SPECIAL_METRICS		m_mWidth;
+		};
+		union
+		{
+			INT					m_nHeight;
+			SPECIAL_METRICS		m_mHeight;
+		};
+
+	public:
+		INT m_nMarginLeft;
+		INT m_nMarginTop;
+		INT m_nMarginRight;
+		INT m_nMarginBottom;
+
+	public:
+		LayoutParam () :
+		  m_nX(0), m_nY(0), m_nWidth(0), m_nHeight(0),
+		  m_nMarginLeft(0), m_nMarginTop(0), m_nMarginRight(0), m_nMarginBottom(0) {}
+	    LayoutParam (X_XML_NODE_TYPE xml);
+
+	public:
+		virtual BOOL FillByXML(X_XML_NODE_TYPE xml);
+
+	private:
+		INT GetSpecialMetrics (LPCSTR pStr);
+
+	public:
+		virtual ~LayoutParam() {}
+	};
+
+	class MeasureParam
+	{
+	public:
+		enum MEASURE_SPEC { MEASURE_UNRESTRICTED, MEASURE_ATMOST, MEASURE_EXACT };
+
+	public:
+		MEASURE_SPEC m_Spec;
+		INT m_nNum;
+
+	public:
+		MeasureParam() : m_Spec(MEASURE_UNRESTRICTED), m_nNum(0) {}
+		BOOL Reset() { m_Spec = MEASURE_UNRESTRICTED; m_nNum = 0; return TRUE;}
+
+	public:
+		BOOL operator == (const MeasureParam & other) const;
+		BOOL operator != (const MeasureParam & other) const
+			{ return this->operator == (other); }
+	};
+
 
 public:
 	virtual BOOL ConfigFrameByXML(X_XML_NODE_TYPE xml);
@@ -49,6 +109,7 @@ public:
 
 public:
 	BOOL SetName(LPCTSTR pName);
+	CString GetName();
 	CXFrame * GetFrameByName(LPCTSTR pName);
 	BOOL GetFrameByName(LPCTSTR pName, std::vector<CXFrame *> *pvFrames);
 
@@ -58,20 +119,15 @@ public:
 	virtual ~CXFrame(void);
 
 public:
-	VOID OnParentRectChanged(CXFrame *pSrcFrame, UINT uEvent, WPARAM wParam, LPARAM lParam, BOOL& bHandled );
-	VOID OnChildRectChanged(CXFrame *pSrcFrame, UINT uEvent, WPARAM wParam, LPARAM lParam, BOOL& bHandled );
-	VOID OnChildMarginChanged(CXFrame *pSrcFrame, UINT uEvent, WPARAM wParam, LPARAM lParam, BOOL& bHandled );
-	VOID OnChildHoldPlaceStateChanged(CXFrame *pSrcFrame, UINT uEvent, WPARAM wParam, LPARAM lParam, BOOL& bHandled );
-
-public:
 	LRESULT OnLButtonDown(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled, BOOL& bCancelBabble);
 	LRESULT OnLButtonUp(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled, BOOL& bCancelBabble);
 	LRESULT OnMouseEnter(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled, BOOL& bCancelBabble);
 	LRESULT OnMouseLeave(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled, BOOL& bCancelBabble);
+	LRESULT OnDelayUpdateLayoutParam(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled, BOOL& bCancelBabble);
+	
 
 public:
-	BOOL Create(CXFrame * pFrameParent, const CRect & rcRect = CRect(0, 0, 0, 0), BOOL bVisible = FALSE,
-		WIDTH_MODE aWidthMode = WIDTH_MODE_NOT_CHANGE, HEIGHT_MODE aHeightMode = HEIGHT_MODE_NOT_CHANGE);
+	BOOL Create(CXFrame * pFrameParent, LayoutParam * pLayout, VISIBILITY visibility = VISIBILITY_NONE);
 	virtual VOID Destroy();
 	BOOL IsFrameActive();
 
@@ -87,24 +143,16 @@ public:
 	BOOL SetParent(CXFrame * pFrameParent);
 	CXFrame * GetParent();
 
-	virtual BOOL SetWidthHeightMode(WIDTH_MODE aWidthMode, HEIGHT_MODE aHeightMode);
-	WIDTH_MODE GetWidthMode();
-	HEIGHT_MODE GetHeightMode();
-	virtual BOOL SetRect(const CRect &rcFrame);
+	virtual BOOL SetRect(const CRect & rcNewFrameRect);
 	BOOL Move(const CPoint &pt);
 	CRect GetRect();
 	virtual INT GetVCenter();
 
-	CRect GetMargin();
-	BOOL SetMargin(const CRect &rect);
-
 	CXFrame * GetTopFrameFromPoint(const CPoint &pt);
 
 public:
-	virtual BOOL SetVisible(BOOL bVisible);
-	BOOL IsVisible();
-	BOOL SetHoldPlace(BOOL bHoldPlace);
-	BOOL IsHoldPlace();
+	virtual BOOL SetVisibility(VISIBILITY visibility);
+	VISIBILITY GetVisibility();
 
 	BOOL GetFocus();
 	BOOL KillFocus();
@@ -124,8 +172,33 @@ public:
 	IXImage * SetSelectedLayer(IXImage *pLayer);
 
 public:
+	virtual LayoutParam * GenerateLayoutParam (LayoutParam *pCopyFrom = NULL);
+	LayoutParam * GenerateLayoutParam (X_XML_NODE_TYPE xml);
+
+	LayoutParam * GetLayoutParam();
+	LayoutParam * BeginUpdateLayoutParam();
+	BOOL BeginUpdateLayoutParam(LayoutParam *pLayoutParam);
+	virtual BOOL EndUpdateLayoutParam();
+
+	virtual BOOL RequestLayout();
+	virtual BOOL IsLayouting();
+
+	BOOL MeasureWidth(const MeasureParam & param);
+	BOOL MeasureHeight(const MeasureParam & param);
+	INT GetMeasuredWidth();
+	INT GetMeasuredHeight();
+
+	BOOL Layout(const CRect & rcRect);
+
+	virtual BOOL OnMeasureWidth(const MeasureParam & param);
+	virtual BOOL OnMeasureHeight(const MeasureParam & param);
+	virtual BOOL OnLayout(const CRect & rcRect);
+
+
+public:
 	virtual BOOL InvalidateRect(const CRect & rect);
 	BOOL InvalidateRect();
+	BOOL InvalidateAfterLayout();
 	virtual BOOL Update();
 
 public:
@@ -137,7 +210,7 @@ public:
 	virtual BOOL PaintBackground(HDC hDC, const CRect &rect);
 	virtual BOOL PaintForeground(HDC hDC, const CRect &rect);
 	virtual HDC GetDC();
-	virtual BOOL ReleaseDC(HDC dc);
+	virtual BOOL ReleaseDC(HDC dc, BOOL bUpdate = TRUE);
 
 public:
 	CPoint ParentToChild(const CPoint &pt);
@@ -176,19 +249,27 @@ public:
 	BOOL ToolTipDestroyEx();
 
 protected:
+	BOOL SetMeasuredWidth(INT width);
+	BOOL SetMeasuredHeight(INT height);
+
+protected:
 	virtual VOID OnDetachedFromParent();
 	virtual VOID OnAttachedToParent(CXFrame *pParent);
 
-	VOID RefreashFrameRect();
-	virtual INT CalculateAdaptBackgroundWidth();
-	virtual INT CalculateAdaptBackgroundHeight();
-	virtual INT CalculateWrapContentWidth();
-	virtual INT CalculateWrapContentHeight();
-
-	virtual VOID ChangeFrameRect(const CRect & rcNewFrameRect);
+protected:
+	MeasureParam GetDefaultMeasureParam(LayoutParam * pLayoutParam);
 
 private:
-	VOID CalculateFrameRect(CRect *pRect);
+	BOOL OnMeasureLayoutDirection (
+		const MeasureParam & param, INT *pMeasuredSize,
+		BOOL (CXFrame::*pfChildMeasureProc)(const MeasureParam &),
+		INT (CXFrame::*pfChildGetMeasurdProc)(),
+		INT LayoutParam::*pLayoutParamPos, 
+		INT LayoutParam::*pnLayoutParamSize, 
+		LayoutParam::SPECIAL_METRICS LayoutParam::*pmLayoutParamSize,
+		INT LayoutParam::*pLayoutMarginEnd);
+
+private:
 	BOOL FillMouseOverLayer();
 	BOOL FillMouseDownLayer();
 	BOOL FillSelectedLayer();
@@ -212,13 +293,16 @@ private:
 	BOOL m_bMouseOver;
 	BOOL m_bMouseDown;
 
-	CRect m_rcFrame;
-	CRect m_rcMargin;
-	BOOL m_bVisible;
-	BOOL m_bHoldPlace;
+	LayoutParam * m_pLayoutParam;
+	LayoutParam * m_pDelayLayoutParam;
+	BOOL m_bDelayUpdateLayoutParamScheduled;
+	MeasureParam m_LastMeasureWidthParam;
+	MeasureParam m_LastMeasureHeightParam;
+	INT m_nMeasuredWidth, m_nMeasuredHeight;
+	BOOL m_bLayoutInvaild;
 
-	WIDTH_MODE m_WidthMode;
-	HEIGHT_MODE m_HeightMode;
+	CRect m_rcFrame;
+	VISIBILITY m_Visibility;
 
 	BOOL m_bIsFrameAlive;
 

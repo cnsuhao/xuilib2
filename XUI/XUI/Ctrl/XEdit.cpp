@@ -28,12 +28,20 @@ CXFrame * CXEdit::CreateFrameFromXML(X_XML_NODE_TYPE xml, CXFrame *pParent)
 	attr = xml->first_attribute("password", 0, false);
 	if (attr && !StrCmpIA(attr->value(), "true")) bPasswordMode = TRUE;
 
+	LayoutParam *pLayout = pParent ?
+		pParent->GenerateLayoutParam(xml) : new CXFrame::LayoutParam(xml);
+	if (!pLayout)
+	{
+		CStringA strError;
+		strError.Format("WARNING: Generating the layout parameter for the parent %s failed. \
+						Building the frame failed. ", XLibST2A(pParent->GetName()));
+		CXFrameXMLFactory::ReportError(strError);
+		return NULL;
+	}
 
 	CXEdit *pEdit = new CXEdit();
-	pEdit->Create(pParent, CXFrameXMLFactory::BuildRect(xml), FALSE,
-		bTransparent, bMultiline, bPasswordMode,
-		(CXFrame::WIDTH_MODE)CXFrameXMLFactory::GetWidthMode(xml),
-		(CXFrame::HEIGHT_MODE)CXFrameXMLFactory::GetHeightMode(xml));
+	pEdit->Create(pParent, pLayout, VISIBILITY_NONE,
+		bTransparent, bMultiline, bPasswordMode);
 
 	return pEdit;
 }
@@ -106,7 +114,7 @@ HDC CXEdit::TxGetDC()
 	// base on the window coordinate system. So that IMEs will be
 	// on its right place. 
 
-	if (!IsVisible())
+	if (GetVisibility() != VISIBILITY_SHOW)
 		return GetEmptyDC();
 
 	HDC dc = GetDC();
@@ -181,8 +189,7 @@ void CXEdit::TxViewChange( BOOL fUpdate )
 BOOL CXEdit::TxShowCaret( BOOL fShow )
 {
 	if (m_pCaret)
-		return m_pCaret->SetVisible(fShow);
-
+		return m_pCaret->SetVisibility(fShow ? VISIBILITY_SHOW : VISIBILITY_HIDE);
 
 	return FALSE;
 }
@@ -212,8 +219,18 @@ BOOL CXEdit::TxSetCaretPos( INT x, INT y )
 	GetCaretPos(&pt);
 
 	if (m_pCaret)
-		return m_pCaret->Move(RootFrameToThisFrame(CPoint(x, y)));
+	{
+		CPoint ptPos = RootFrameToThisFrame(CPoint(x, y));
 
+		LayoutParam *pLayoutParam = m_pCaret->BeginUpdateLayoutParam();
+		ATLASSERT(pLayoutParam);
+		if (pLayoutParam)
+		{
+			pLayoutParam->m_nX = ptPos.x;
+			pLayoutParam->m_nY = ptPos.y;
+			return m_pCaret->EndUpdateLayoutParam();
+		}
+	}
 
 	return FALSE;
 }
@@ -594,11 +611,16 @@ BOOL CXEdit::PaintForeground( HDC hDC, const CRect &rcUpdate )
 	return __super::PaintForeground(hDC, rcUpdate);
 }
 
-BOOL CXEdit::Create( CXFrame * pFrameParent, const CRect & rcRect /*= CRect(0, 0, 0, 0)*/, BOOL bVisible /*= FALSE*/, 
-					BOOL bTransparent /*= FALSE*/, BOOL bMultiline /*= FALSE*/, BOOL bPasswordMode /*= FALSE*/,
-					WIDTH_MODE aWidthMode /*= WIDTH_MODE_NOT_CHANGE*/, HEIGHT_MODE aHeightMode /*= HEIGHT_MODE_NOT_CHANGE*/ )
+BOOL CXEdit::Create( CXFrame * pFrameParent, LayoutParam * pLayout,  VISIBILITY visibility/* = VISIBILITY_NONE*/, 
+					BOOL bTransparent /*= FALSE*/, BOOL bMultiline /*= FALSE*/, BOOL bPasswordMode /*= FALSE*/)
 {
 	ATLASSERT(m_pTextService == NULL);
+
+	if (!pLayout) 
+	{
+		ATLASSERT(!_T("No layout parameter. "));
+		return NULL;
+	}
 
 	ResetCharFormat();
 	ResetParaFormat();
@@ -617,12 +639,12 @@ BOOL CXEdit::Create( CXFrame * pFrameParent, const CRect & rcRect /*= CRect(0, 0
 
 	if (bRtn)
 	{
-		bRtn = __super::Create(pFrameParent, rcRect, bVisible, aWidthMode, aHeightMode);
+		bRtn = __super::Create(pFrameParent, pLayout, visibility);
 
 		if (bRtn)
 		{
 			m_pCaret = new CXCaret();
-			m_pCaret->Create(this);
+			m_pCaret->Create(this, GenerateLayoutParam());
 		}
 	}
 
@@ -756,7 +778,7 @@ LRESULT CXEdit::OnAllMessage( UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHa
 	LRESULT lResult = 0;
 
 	if (uMsg == WM_KILLFOCUS && m_pCaret)
-		m_pCaret->SetVisible(FALSE);
+		m_pCaret->SetVisibility(VISIBILITY_HIDE);
 
 	if (m_pTextService)
 	{
@@ -948,15 +970,17 @@ BOOL CXEdit::IsAncester( CXFrame *pFrame )
 	return FALSE;
 }
 
-VOID CXEdit::ChangeFrameRect( const CRect & rcNewFrameRect )
+BOOL CXEdit::SetRect( const CRect & rcNewFrameRect )
 {
 	if (GetRect() == rcNewFrameRect)
-		return;
+		return TRUE;
 
-	__super::ChangeFrameRect(rcNewFrameRect);
+	BOOL bRtn = __super::SetRect(rcNewFrameRect);
 
 	if (m_pTextService)
-		m_pTextService->OnTxPropertyBitsChange(TXTBIT_CLIENTRECTCHANGE, 0);	
+		m_pTextService->OnTxPropertyBitsChange(TXTBIT_CLIENTRECTCHANGE, 0);
+
+	return TRUE;
 }
 
 HDC CXEdit::GetEmptyDC()

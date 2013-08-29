@@ -16,6 +16,7 @@ public:
 	virtual BOOL SetDstRect(const CRect &rcDst);
 
 	virtual CString GetText();
+	virtual CSize Measure(HDC dc, INT nWidthLimit);
 	
 public:
 	BOOL SetText(LPCTSTR szText);

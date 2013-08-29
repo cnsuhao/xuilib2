@@ -15,8 +15,7 @@ class CXDialog :
 	public CXWindow
 {
 public:
-	INT DoModel(CXWindow *pParent, CRect rcWindow = CRect(0, 0, 0, 0), BOOL bNeedCenterWindow = TRUE, BOOL bVisible = TRUE,
-		WIDTH_MODE aWidthMode = WIDTH_MODE_NOT_CHANGE, HEIGHT_MODE aHeightMode = HEIGHT_MODE_NOT_CHANGE);
+	INT DoModel(CXWindow *pParent, LayoutParam * pLayout, BOOL bNeedCenterWindow = TRUE, BOOL bVisible = TRUE);
 	BOOL EndDialog(INT nDetail);
 
 public:

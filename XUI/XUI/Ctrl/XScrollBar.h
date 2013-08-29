@@ -19,24 +19,22 @@ public:
 	enum ScrollType{SCROLL_H, SCROLL_V};
 
 public:
-	BOOL Create(CXFrame * pFrameParent, ScrollType type, const CRect & rcRect = CRect(0, 0, 0, 0), BOOL bVisible = FALSE,
-		IXImage * pBarBackground = NULL, IXImage * pBarImage = NULL,
-		WIDTH_MODE aWidthMode = WIDTH_MODE_NOT_CHANGE, HEIGHT_MODE aHeightMode = HEIGHT_MODE_NOT_CHANGE);
+	BOOL Create(CXFrame * pFrameParent, ScrollType type, LayoutParam * pLayout, VISIBILITY visibility = VISIBILITY_NONE,
+		IXImage * pBarBackground = NULL, IXImage * pBarImage = NULL);
 
 public:
-	BOOL SetFrameLen(INT nLen);
+	BOOL SetContentLen(INT nLen);
 	BOOL SetViewLen(INT nLen);
 	BOOL SetScrollPos(INT nPos);
 	INT GetScrollPos();
 	IXImage * SetBarImage(IXImage *pImage);
 
 public:
-	virtual BOOL SetVisible(BOOL bVisible);
+	virtual BOOL SetRect(const CRect & rcNewFrameRect);
+	virtual BOOL SetVisibility(VISIBILITY visibility);
 	virtual BOOL PaintForeground(HDC hDC, const CRect &rect);
 	virtual VOID Destroy();
-
-protected:
-	virtual VOID ChangeFrameRect(const CRect & rcNewFrameRect);
+	
 
 public:
 	LRESULT OnLButtonDown(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled, BOOL& bCancelBabble);
@@ -49,11 +47,12 @@ public:
 
 private:
 	VOID UpdateScrollBar();
+	VOID NotifyScrollChange();
 
 private:
 	ScrollType m_Type;
 	IXImage *m_pImageBar;
-	INT m_nFrameLen;
+	INT m_nContentLen;
 	INT m_nViewLen;
 	INT m_nPos;
 
@@ -65,5 +64,6 @@ private:
 
 private:
 	BOOL m_bMouseDown;
-	CPoint m_ptLastMousePt;
+	CPoint m_ptMouseDownPt;
+	INT m_nMouseDownScrollPos;
 };

@@ -1,5 +1,6 @@
 #include "StdAfx.h"
 #include "XAnimation.h"
+#include "..\..\..\XLib\inc\interfaceS\string\StringCode.h"
 
 X_IMPLEMENT_FRAME_XML_RUNTIME(CXAnimation)
 
@@ -36,11 +37,20 @@ CXFrame * CXAnimation::CreateFrameFromXML(X_XML_NODE_TYPE xml, CXFrame *pParent)
 		CXFrameXMLFactory::ReportError("WARNING: Wrong frame switch interval specified for the XAnimation, Create the XAnimation failed. ");
 		return NULL;
 	}
- 
+
+	LayoutParam *pLayout = pParent ?
+		pParent->GenerateLayoutParam(xml) : new CXFrame::LayoutParam(xml);
+	if (!pLayout)
+	{
+		CStringA strError;
+		strError.Format("WARNING: Generating the layout parameter for the parent %s failed. \
+						Building the frame failed. ", XLibST2A(pParent->GetName()));
+		CXFrameXMLFactory::ReportError(strError);
+		return NULL;
+	}
  	
  	CXAnimation *pFrame = new CXAnimation();
-	pFrame->Create(pParent, pFrames, nFrameCount, nSwitchInterval, CXFrameXMLFactory::BuildRect(xml), FALSE,
-		(CXFrame::WIDTH_MODE)CXFrameXMLFactory::GetWidthMode(xml), (CXFrame::HEIGHT_MODE)CXFrameXMLFactory::GetHeightMode(xml));
+	pFrame->Create(pParent, pFrames, nFrameCount, nSwitchInterval, pLayout, VISIBILITY_NONE);
  
  	return pFrame;
 }
@@ -55,15 +65,15 @@ CXAnimation::CXAnimation(void)
 {
 }
 
-VOID CXAnimation::ChangeFrameRect( const CRect & rcNewFrameRect )
+BOOL CXAnimation::SetRect( const CRect & rcNewFrameRect )
 {
 	if (GetRect() == rcNewFrameRect)
-		return;
+		return TRUE;
 
 	if (m_pFrames)
 		m_pFrames->SetDstRect(CRect(0, 0, rcNewFrameRect.Width(), rcNewFrameRect.Height()));
 
-	__super::ChangeFrameRect(rcNewFrameRect);
+	return __super::SetRect(rcNewFrameRect);
 }
 
 
@@ -72,7 +82,7 @@ BOOL CXAnimation::PaintForeground( HDC hDC, const CRect &rect )
 	if (m_pFrames)
 		m_pFrames->Draw(hDC, rect);
 
-	return TRUE;
+	return __super::PaintForeground(hDC, rect);
 }
 
 BOOL CXAnimation::SetFrames( IXImage *pFrames, UINT nFrameCount )
@@ -101,10 +111,7 @@ BOOL CXAnimation::SetFrames( IXImage *pFrames, UINT nFrameCount )
 
 	m_nCurrentFrame = 0;
 
-	if (GetWidthMode() == WIDTH_MODE_WRAP_CONTENT ||
-		GetHeightMode() == HEIGHT_MODE_WRAP_CONTENT)
-		RefreashFrameRect();
-
+	RequestLayout();
 	InvalidateRect();
 
 	return TRUE;
@@ -161,35 +168,54 @@ VOID CXAnimation::Destroy()
 	return __super::Destroy();
 }
 
-INT CXAnimation::CalculateWrapContentWidth()
-{
-	INT nParentWrapContentWidth = __super::CalculateWrapContentWidth();
-
-	if (!m_pFrames || !m_nFrameCount)
-		return nParentWrapContentWidth;
-
-	return max(nParentWrapContentWidth, m_pFrames->GetImageWidth() / m_nFrameCount);
-}
-
-INT CXAnimation::CalculateWrapContentHeight()
-{
-	INT nParentWrapContentHeight = __super::CalculateWrapContentHeight();
-
-	if (!m_pFrames)
-		return nParentWrapContentHeight;
-
-	return max(nParentWrapContentHeight, m_pFrames->GetImageHeight());
-}
-
 BOOL CXAnimation::Create( CXFrame * pFrameParent, IXImage *pFrames, UINT nFrameCount, UINT nSwitchFrameInterval, 
-						 const CRect & rcRect /*= CRect(0, 0, 0, 0)*/, BOOL bVisible /*= FALSE*/, 
-						 WIDTH_MODE aWidthMode /*= WIDTH_MODE_NOT_CHANGE*/, HEIGHT_MODE aHeightMode /*= HEIGHT_MODE_NOT_CHANGE*/ )
+						 LayoutParam * pLayout,  VISIBILITY visibility /*= VISIBILITY_NONE*/)
 {
-	BOOL bRtn = __super::Create(pFrameParent, rcRect, bVisible, aWidthMode, aHeightMode);
+	if (!pLayout) 
+	{
+		ATLASSERT(!_T("No layout parameter. "));
+		return FALSE;
+	}
+
+	BOOL bRtn = __super::Create(pFrameParent, pLayout, visibility);
 
 	SetFrames(pFrames, nFrameCount);
 
 	SetFrameSwitchInterval(nSwitchFrameInterval);
+
+	return bRtn;
+}
+
+BOOL CXAnimation::OnMeasureWidth( const MeasureParam & param )
+{
+	BOOL bRtn = __super::OnMeasureWidth(param);
+
+	if (param.m_Spec == MeasureParam::MEASURE_EXACT 
+		|| !m_pFrames || !m_nFrameCount)
+		return bRtn;
+
+	int nMeasured = max(GetMeasuredWidth(), m_pFrames->GetImageWidth() / m_nFrameCount);
+	if (param.m_Spec == MeasureParam::MEASURE_ATMOST)
+		nMeasured = min(nMeasured, param.m_nNum);
+
+	SetMeasuredWidth(nMeasured);
+
+	return bRtn;
+}
+
+BOOL CXAnimation::OnMeasureHeight( const MeasureParam & param )
+{
+	BOOL bRtn = __super::OnMeasureHeight(param);
+
+	if (param.m_Spec == MeasureParam::MEASURE_EXACT
+		|| !m_pFrames || !m_nFrameCount)
+		return bRtn;
+
+	int nMeasured = max(GetMeasuredHeight(), m_pFrames->GetImageHeight());
+	if (param.m_Spec == MeasureParam::MEASURE_ATMOST)
+		nMeasured = min(nMeasured, param.m_nNum);
+
+	SetMeasuredHeight(nMeasured);
 
 	return bRtn;
 }

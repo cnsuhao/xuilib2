@@ -84,7 +84,7 @@ public:
 		if (m_rRootFrame)
 		{
 			CTestDialog dlg;
-			dlg.DoModel(m_rRootFrame, CRect(0, 0, 0, 0), TRUE, TRUE, CXFrame::WIDTH_MODE_NOT_CHANGE, CXFrame::HEIGHT_MODE_ADAPT_BACKGROUND);
+			dlg.DoModel(m_rRootFrame, new CXFrame::LayoutParam(), TRUE, TRUE);
 		}
 		
 	}

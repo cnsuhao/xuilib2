@@ -50,9 +50,6 @@ public:
 		const char * pPartRectListPrefix = NULL);
 	static CRect BuildRect(X_XML_NODE_TYPE xml, const char * pRectPrefix = NULL);
 	static IXText * BuildText(X_XML_NODE_TYPE xml, const char * pTextPrefix = NULL);
-	/* We use an INT here because we have no way to use CXFrame::WIDTH_MODE or CXFrame::HEIGHT_MODE. */
-	static INT GetWidthMode(X_XML_NODE_TYPE xml, const char * pRectPrefix = NULL);
-	static INT GetHeightMode(X_XML_NODE_TYPE xml, const char * pRectPrefix = NULL);
 
 private:
 	typedef std::map<const CHAR *, IXFrameXMLRuntimeInfo *, CXFrameXMLFactory_CompareRawString> FRAME_FACTORY_MAP_TYPE; 
@@ -100,11 +97,19 @@ CXFrame * classname::CreateFrameFromXML(X_XML_NODE_TYPE xml, CXFrame *pParent)		
 	if (!xml)																							\
 		return FALSE;																					\
 																										\
-	classname *pFrame = new classname();																\
+	LayoutParam *pLayout = pParent ?																	\
+		pParent->GenerateLayoutParam(xml) : new CXFrame::LayoutParam(xml);								\
+	if (!pLayout)																						\
+	{																									\
+		CStringA strError;																				\
+		strError.Format("WARNING: Generating the layout parameter for the parent %s failed. \\			\
+			Building the frame failed. ", XLibST2A(pParent->GetName()));								\
+		CXFrameXMLFactory::ReportError(strError);														\
+		return NULL;																					\
+	}																									\
 																										\
-	pFrame->Create(pParent, CXFrameXMLFactory::BuildRect(xml), FALSE,									\
-		(CXFrame::WIDTH_MODE)CXFrameXMLFactory::GetWidthMode(xml),										\
-		(CXFrame::HEIGHT_MODE)CXFrameXMLFactory::GetHeightMode(xml));									\
+	classname *pFrame = new classname();																\
+	pFrame->Create(pParent, pLayout, VISIBILITY_NONE);													\
 																										\
 	return pFrame;																						\
 }

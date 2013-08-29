@@ -23,6 +23,7 @@ public:
 
 public:
 	BOOL PostFrameMsg(CXFrame *pFrame, UINT uMsg, WPARAM wParam, LPARAM lParam);
+	BOOL HasPendingMsg(UINT uMsg);
 	/* return value of 0 indicates a failure, and timer IDs are always greater then zero. */
 	UINT SetTimer(CXFrame *pFrame, UINT uElapse); 
 	BOOL KillTimer(UINT nTimerID);
@@ -47,6 +48,7 @@ private:
 
 public:
 	std::vector<PostFrameMsgInfo> m_vPostFrameMsg;
+	std::set<UINT> m_setPendingMsg;
 	BOOL m_bPostFrameMsgScheduled;
 	std::vector<CRemoteRef<CXFrame>> m_vrTimerFrames;
 };

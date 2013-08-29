@@ -9,16 +9,15 @@ class CXTree :
 	#pragma comment(linker, "/INCLUDE:?s_xml_runtime_info@CXTree@@0VCXFrameXMLRuntime_CXTree@1@A")
 
 	BEGIN_FRAME_EVENT_MAP(CXTree)
-		CHAIN_FRAME_EVENT_MAP(CXDock)
+		CHAIN_FRAME_EVENT_MAP(CXFrame)
 		FRAME_EVENT_HANDLER(EVENT_BUTTON_CLICKED, OnFoldUnfoldButtonClicked)
-		FRAME_EVENT_FRAME_HANDLER(EVENT_DOCK_ITEMS_REDOCK_BEGIN, m_pChildItemFrameContainer, OnChildItemFrameRedock)
-		FRAME_EVENT_FRAME_HANDLER(EVENT_DOCK_ITEMS_REDOCKED, m_pChildItemFrameContainer, OnChildItemFrameRedock)
+		FRAME_EVENT_FRAME_HANDLER(EVENT_FRAME_RECT_CHANGED, m_pRootItemFrameContainer, OnRootFrameRectChanged)
+		FRAME_EVENT_HANDLER(EVENT_FRAME_RECT_CHANGED, OnFoldUnfoldButtonFrameChanged)
 	END_FRAME_EVENT_MAP()
 
 public:
-	BOOL Create(CXFrame * pFrameParent, const CRect & rcRect = CRect(0, 0, 0, 0), BOOL bVisible = FALSE,
-		BOOL bUnfolded = TRUE, UINT nChildIndent=20, IXImage *pFoldedButtonFace = NULL, IXImage *pUnfoldedButtonFace = NULL,
-		WIDTH_MODE aWidthMode = WIDTH_MODE_NOT_CHANGE, HEIGHT_MODE aHeightMode = HEIGHT_MODE_NOT_CHANGE);
+	BOOL Create(CXFrame * pFrameParent, LayoutParam * pLayout, VISIBILITY visibility = VISIBILITY_NONE,
+		BOOL bUnfolded = TRUE, UINT nChildIndent=20, IXImage *pFoldedButtonFace = NULL, IXImage *pUnfoldedButtonFace = NULL);
 
 public:
 	BOOL SetUnfold(BOOL bUnfold);
@@ -32,9 +31,12 @@ public:
 	UINT GetChildItemFrameCount();
 	CXFrame * RemoveChildItemFrame(UINT nIndex);
 
+ 	virtual BOOL OnLayout(const CRect & rcRect);
+
 public:
 	VOID OnFoldUnfoldButtonClicked(CXFrame *pSrcFrame, UINT uEvent, WPARAM wParam, LPARAM lParam, BOOL& bHandled );
-	VOID OnChildItemFrameRedock(CXFrame *pSrcFrame, UINT uEvent, WPARAM wParam, LPARAM lParam, BOOL& bHandled );
+	VOID OnFoldUnfoldButtonFrameChanged( CXFrame *pSrcFrame, UINT uEvent, WPARAM wParam, LPARAM lParam, BOOL& bHandled );
+	VOID OnRootFrameRectChanged( CXFrame *pSrcFrame, UINT uEvent, WPARAM wParam, LPARAM lParam, BOOL& bHandled );
 
 public:
 	virtual BOOL HandleXMLChildNodes(X_XML_NODE_TYPE xml);
@@ -47,9 +49,11 @@ public:
 
 private:
 	VOID InvalidateLines();
+	VOID UpdateLeftMarginOfChildItemContainer();
 
 private:
 	CXDock * m_pRootItemFrameContainer;
 	CXDock * m_pChildItemFrameContainer;
+	INT m_nChildIndent;
 };
  

@@ -397,62 +397,6 @@ IXText * CXFrameXMLFactory::BuildText( X_XML_NODE_TYPE xml, const char * pTextPr
 	return pText;
 }
 
-INT CXFrameXMLFactory::GetWidthMode( X_XML_NODE_TYPE xml, const char * pRectPrefix /*= NULL*/ )
-{
-	CXFrame::WIDTH_MODE rtn = 
-		CXFrame::WIDTH_MODE_NOT_CHANGE;
-
-	if (!xml)
-		return rtn;
-
-	X_XML_ATTR_TYPE attr = NULL;
-
-	CStringA strRectPrefix;
-	if (pRectPrefix)
-		strRectPrefix = pRectPrefix;
-
-	if (attr = xml->first_attribute(strRectPrefix + "width", 0, false))
-	{
-		char *pText = attr->value();
-		if (!StrCmpIA("reach_parent", pText))
-			rtn = CXFrame::WIDTH_MODE_REACH_PARENT;
-		else if (!StrCmpIA("wrap_content", pText))
-			rtn = CXFrame::WIDTH_MODE_WRAP_CONTENT;
-		else if (!StrCmpIA("adapt_background", pText))
-			rtn = CXFrame::WIDTH_MODE_ADAPT_BACKGROUND;
-	}
-	
-	return rtn;
-}
-
-INT CXFrameXMLFactory::GetHeightMode( X_XML_NODE_TYPE xml, const char * pRectPrefix /*= NULL*/ )
-{
-	CXFrame::HEIGHT_MODE rtn = 
-		CXFrame::HEIGHT_MODE_NOT_CHANGE;
-
-	if (!xml)
-		return rtn;
-
-	X_XML_ATTR_TYPE attr = NULL;
-
-	CStringA strRectPrefix;
-	if (pRectPrefix)
-		strRectPrefix = pRectPrefix;
-
-	if (attr = xml->first_attribute(strRectPrefix + "height", 0, false))
-	{
-		char *pText = attr->value();
-		if (!StrCmpIA("reach_parent", pText))
-			rtn = CXFrame::HEIGHT_MODE_REACH_PARENT;
-		else if (!StrCmpIA("wrap_content", pText))
-			rtn = CXFrame::HEIGHT_MODE_WRAP_CONTENT;
-		else if (!StrCmpIA("adapt_background", pText))
-			rtn = CXFrame::HEIGHT_MODE_ADAPT_BACKGROUND;
-	}
-
-	return rtn;
-}
-
 CString CXFrameXMLFactory::MakePath( LPCTSTR pPath )
 {
 	if (!pPath)

@@ -2,10 +2,22 @@
 
 #include "../Base/XFrameXMLFactory.h"
 #include "XSysControl.h"
+#include "../../../XLib/inc/interfaceS/string/StringCode.h"
 
 CXFrame * XFrameXMLFactoryForSysControl(X_XML_NODE_TYPE xml, CXFrame *pParent)
 {
 	X_XML_ATTR_TYPE attr = NULL;
+
+	CXFrame::LayoutParam *pLayout = pParent ?
+		pParent->GenerateLayoutParam(xml) : new CXFrame::LayoutParam(xml);
+	if (!pLayout)
+	{
+		CStringA strError;
+		strError.Format("WARNING: Generating the layout parameter for the parent %s failed. \
+						Building the frame failed. ", XLibST2A(pParent->GetName()));
+		CXFrameXMLFactory::ReportError(strError);
+		return NULL;
+	}
 
 	CRect rcFrame(0, 0, 0, 0);
 
@@ -22,9 +34,7 @@ CXFrame * XFrameXMLFactoryForSysControl(X_XML_NODE_TYPE xml, CXFrame *pParent)
 	if (!StrCmpIA(pType, "edit"))
 	{
 		CXSysControl<CEdit> *pFrame = new CXSysControl<CEdit>;
-		pFrame->Create(pParent, CXFrameXMLFactory::BuildRect(xml), FALSE, 
-			(CXFrame::WIDTH_MODE)CXFrameXMLFactory::GetWidthMode(xml),
-			(CXFrame::HEIGHT_MODE)CXFrameXMLFactory::GetHeightMode(xml));
+		pFrame->Create(pParent, pLayout, CXFrame::VISIBILITY_NONE);
 		return pFrame;
 	}
 	else if (FALSE)

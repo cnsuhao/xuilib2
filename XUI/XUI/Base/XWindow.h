@@ -3,6 +3,7 @@
 #include "XFrame.h"
 
 #define WM_X_UPDATE (WM_USER + 0x100)
+#define WM_X_LAYOUT (WM_USER + 0x101)
 
 class CXWindow : public CXFrame, public CWindowImpl<CXWindow>
 {
@@ -19,7 +20,7 @@ public:
 	/// 支持子类自定义类名
 	virtual LPCTSTR GetClassName(){return _T("XWindow");}
 	ATL::CWndClassInfo GetWndClassInfo();
-	HWND Create(HWND hWndParent, _U_RECT rect = NULL, WIDTH_MODE aWidthMode = WIDTH_MODE_NOT_CHANGE, HEIGHT_MODE aHeightMode = HEIGHT_MODE_NOT_CHANGE,
+	HWND Create(HWND hWndParent,  LayoutParam * pLayout,
 		LPCTSTR szWindowName = NULL, DWORD dwStyle = 0, DWORD dwExStyle = 0, _U_MENUorID MenuOrID = 0U, LPVOID lpCreateParam = NULL);
 
 	BEGIN_MSG_MAP(CXWindow)
@@ -41,6 +42,7 @@ public:
 		MESSAGE_HANDLER(WM_GETMINMAXINFO, OnMinMaxInfo)
 		MESSAGE_HANDLER(WM_ENABLE, OnEnable)
 		MESSAGE_HANDLER(WM_X_UPDATE, OnXUpdate)
+		MESSAGE_HANDLER(WM_X_LAYOUT, OnXLayout)
 	END_MSG_MAP()
 
 public:
@@ -63,6 +65,7 @@ public:
 
 public:
 	LRESULT OnXUpdate(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled);
+	LRESULT OnXLayout(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled);
 	
 public:
 	BOOL SetAlpha(BYTE cAlpha);
@@ -75,15 +78,21 @@ public:
 	CRect GetCaptionRect();
 	BOOL SetResizable(BOOL bResizable);
 	
-
 public:
+	virtual BOOL SetRect(const CRect & rcNewFrameRect);
+
 	virtual HDC GetDC();
-	virtual BOOL ReleaseDC(HDC dc);
+	virtual BOOL ReleaseDC(HDC dc, BOOL bUpdate = TRUE);
+
+	virtual BOOL EndUpdateLayoutParam();
+
+	virtual BOOL RequestLayout();
+	virtual BOOL IsLayouting();
 
 	virtual BOOL InvalidateRect(const CRect & rect);
 	virtual BOOL Update();
 
-	virtual BOOL SetVisible(BOOL bVisible);
+	virtual BOOL SetVisibility(VISIBILITY visibility);
 
 	virtual CPoint FrameToWindow(const CPoint &pt);
 	virtual CPoint FrameToScreen(const CPoint &pt);
@@ -93,10 +102,6 @@ public:
 	virtual CXFrameMsgMgr *GetFrameMsgMgr();
 
 	virtual VOID Destroy();
-
-protected:
-	virtual BOOL SetWidthHeightMode(WIDTH_MODE aWidthMode, HEIGHT_MODE aHeightMode);
-	virtual VOID ChangeFrameRect(const CRect & rcNewFrameRect);
 
 private:
 	VOID RefreashCaptionRect();
@@ -114,6 +119,8 @@ private:
 	HGDIOBJ m_hBufferOldBmp;
 	HGDIOBJ m_hBufferForDirectDrawOldBmp;
 	std::vector<CRect> m_vRectInvalidated;
+	BOOL m_bLayoutScheduled;
+	BOOL m_bIsLayouting;
 	BOOL m_bUpdateScheduled;
 
 	BYTE m_cAlpha;

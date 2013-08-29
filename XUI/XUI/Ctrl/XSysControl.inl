@@ -1,10 +1,15 @@
 
 template<class TCtrl>
-BOOL CXSysControl<TCtrl>::Create( CXFrame * pFrameParent, const CRect & rcRect /*= CRect(0, 0, 0, 0)*/, BOOL bVisible /*= FALSE*/ ,
-								 WIDTH_MODE aWidthMode/* = WIDTH_MODE_NOT_CHANGE*/, HEIGHT_MODE aHeightMode/* = HEIGHT_MODE_NOT_CHANGE*/)
+BOOL CXSysControl<TCtrl>::Create( CXFrame * pFrameParent, LayoutParam * pLayout, VISIBILITY visibility /*= VISIBILITY_NONE*/)
 {
+	if (!pLayout) 
+	{
+		ATLASSERT(!_T("No layout parameter. "));
+		return FALSE;
+	}
+
 	return __super::Create(NULL, &CRect(0, 0, 0, 0), NULL, WS_POPUP, WS_EX_TOOLWINDOW, 0U, NULL) && 
-		__super::Create(pFrameParent, rcRect, bVisible, aWidthMode, aHeightMode);
+		__super::Create(pFrameParent, pLayout, visibility);
 }
 
 
@@ -32,18 +37,20 @@ BOOL CXSysControl<TCtrl>::InsertFrame( CXFrame * pFrame, UINT nIndex )
 
 
 template<class TCtrl>
-VOID CXSysControl<TCtrl>::ChangeFrameRect( const CRect & rcNewFrameRect )
+BOOL CXSysControl<TCtrl>::SetRect( const CRect & rcNewFrameRect )
 {
 	if (CXFrame::GetRect() == rcNewFrameRect)
-		return;
+		return TRUE;
 
-	__super::ChangeFrameRect(rcNewFrameRect);
+	BOOL bRtn = __super::SetRect(rcNewFrameRect);
 
 	if (IsWindow() && !m_bUpdatePositionScheduled)
 	{
 		PostFrameMsg(FRAME_MSG_UPDATE_POSITION, 0, 0);
 		m_bUpdatePositionScheduled = TRUE;
 	}
+
+	return bRtn;
 }
 
 
@@ -62,13 +69,12 @@ BOOL CXSysControl<TCtrl>::UpdateSysControlPosition()
 }
 
 template<class TCtrl>
-BOOL CXSysControl<TCtrl>::SetVisible( BOOL bVisible )
+BOOL CXSysControl<TCtrl>::SetVisibility( VISIBILITY visibility )
 {
-	if ((IsVisible() && bVisible) ||
-		(!IsVisible() && !bVisible))
+	if (GetVisibility() == visibility)
 		return TRUE;
 
-	BOOL bRtn = __super::SetVisible(bVisible);
+	BOOL bRtn = __super::SetVisibility(visibility);
 
 	if (IsWindow())
 		UpdateShowState();
@@ -127,20 +133,20 @@ BOOL CXSysControl<TCtrl>::UpdateShowState()
 	CXFrame *p = CXFrame::GetParent();
 	if (p && p->GetHWND())
 	{
-		bParentFrameShow = p->IsVisible();
+		bParentFrameShow = p->GetVisibility() == VISIBILITY_SHOW;
 		p = p->GetParent();
 	}
 	
 	while (bParentFrameShow && p)
 	{
-		if (!p->IsVisible())
+		if (p->GetVisibility() != VISIBILITY_SHOW)
 			bParentFrameShow = FALSE;
 		p = p->GetParent();
 	}
 
 	BOOL bWindowShowed = IsWindowVisible();
 
-	BOOL bFrameShow = IsVisible();
+	BOOL bFrameShow = GetVisibility() == VISIBILITY_SHOW;
 	BOOL bShow = bFrameShow && bParentFrameShow;
 
 	if ((bWindowShowed && bShow) || (!bWindowShowed && !bShow ))
@@ -310,17 +316,6 @@ VOID CXSysControl<TCtrl>::OnAttachedToParent(CXFrame *pParent)
 	UpdateSysControlPosition();
 
 	UpdateShowState();
-}
-
-template<class TCtrl>
-BOOL CXSysControl<TCtrl>::SetWidthHeightMode( WIDTH_MODE aWidthMode, HEIGHT_MODE aHeightMode )
-{
-	if (aWidthMode == WIDTH_MODE_ADAPT_BACKGROUND || aWidthMode == WIDTH_MODE_WRAP_CONTENT)
-		aWidthMode = WIDTH_MODE_NOT_CHANGE;
-	if (aHeightMode == HEIGHT_MODE_ADAPT_BACKGROUND || aHeightMode == HEIGHT_MODE_REACH_PARENT)
-		aHeightMode = HEIGHT_MODE_NOT_CHANGE;
-
-	return __super::SetWidthHeightMode(aWidthMode, aHeightMode);
 }
 
 template<class TCtrl>

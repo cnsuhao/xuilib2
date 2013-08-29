@@ -1,5 +1,6 @@
 #include "StdAfx.h"
 #include "XMultifaceButton.h"
+#include "..\..\..\XLib\inc\interfaceS\string\StringCode.h"
 
 #define NOT_DELETE
 
@@ -9,6 +10,17 @@ CXFrame * CXMultifaceButton::CreateFrameFromXML(X_XML_NODE_TYPE xml, CXFrame *pP
 {
  	if (!xml)
  		return NULL;
+
+	LayoutParam *pLayout = pParent ?
+		pParent->GenerateLayoutParam(xml) : new CXFrame::LayoutParam(xml);
+	if (!pLayout)
+	{
+		CStringA strError;
+		strError.Format("WARNING: Generating the layout parameter for the parent %s failed. \
+						Building the frame failed. ", XLibST2A(pParent->GetName()));
+		CXFrameXMLFactory::ReportError(strError);
+		return NULL;
+	}
  
  	X_XML_ATTR_TYPE attr = NULL;
  
@@ -33,9 +45,8 @@ CXFrame * CXMultifaceButton::CreateFrameFromXML(X_XML_NODE_TYPE xml, CXFrame *pP
  
  	CXMultifaceButton *pFrame = new CXMultifaceButton();
 	pFrame->Create(pParent, vImageList.size() ? &vImageList[0] : NULL, vImageList.size(), 
-		CXFrameXMLFactory::BuildRect(xml), FALSE,
-		nStartButtonFace, bDisabled,
-		(CXFrame::WIDTH_MODE)CXFrameXMLFactory::GetWidthMode(xml), (CXFrame::HEIGHT_MODE)CXFrameXMLFactory::GetHeightMode(xml));
+		pLayout, VISIBILITY_NONE,
+		nStartButtonFace, bDisabled);
  
  	return pFrame;
 
@@ -48,10 +59,15 @@ CXMultifaceButton::CXMultifaceButton(void)
 
 BOOL CXMultifaceButton::Create(CXFrame * pFrameParent, 
 							   IXImage **pButtonFaces, UINT nButtonFaceCount, 
-							   const CRect & rc /*= CRect(0, 0, 0, 0)*/, BOOL bVisible /*= FALSE*/, 
-							   UINT nStartButtonFace /*= 0*/, BOOL bDisabled /*= FALSE*/, 
-							   WIDTH_MODE aWidthMode /*= WIDTH_MODE_NOT_CHANGE*/, HEIGHT_MODE aHeightMode /*= HEIGHT_MODE_NOT_CHANGE*/ )
+							   LayoutParam * pLayout,  VISIBILITY visibility /*= VISIBILITY_NONE*/, 
+							   UINT nStartButtonFace /*= 0*/, BOOL bDisabled /*= FALSE*/)
 {
+	if (!pLayout) 
+	{
+		ATLASSERT(!_T("No layout parameter. "));
+		return NULL;
+	}
+
 	if (pButtonFaces && nButtonFaceCount > 0)
 		m_vButtonFaces.insert(m_vButtonFaces.end(), pButtonFaces, pButtonFaces + nButtonFaceCount);
 
@@ -62,7 +78,7 @@ BOOL CXMultifaceButton::Create(CXFrame * pFrameParent,
 		pCurrentButtonFace = pButtonFaces[nStartButtonFace];
 	}
 
-	return __super::Create(pFrameParent, rc, bVisible, bDisabled, pCurrentButtonFace, aWidthMode, aHeightMode);
+	return __super::Create(pFrameParent, pLayout, visibility, bDisabled, pCurrentButtonFace);
 }
 
 BOOL CXMultifaceButton::ChangeButtonFaceTo( UINT nButtonFaceIndex )

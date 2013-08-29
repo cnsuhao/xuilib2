@@ -14,7 +14,7 @@ class CXSysControl
 	BEGIN_FRAME_EVENT_MAP(CXSysControl<TCtrl>)
 		CHAIN_FRAME_EVENT_MAP(CXFrame)
 		FRAME_EVENT_HANDLER(EVENT_FRAME_RECT_CHANGED, OnAncestorRectChanged)
-		FRAME_EVENT_HANDLER(EVENT_FRAME_SHOWHIDE_CHANGED, OnAncestorShowHide)
+		FRAME_EVENT_HANDLER(EVENT_FRAME_VISIBILITY_CHANGED, OnAncestorShowHide)
 		FRAME_EVENT_HANDLER(EVENT_WND_MOVED, OnAncestorRectChanged)
 		FRAME_EVENT_HANDLER(EVENT_WND_ENABLED, OnParentWndEnabled)
 		FRAME_EVENT_HANDLER(EVENT_FRAME_ATTACHED_TO_PARENT, OnOneAncestorAttachedToParent)
@@ -30,18 +30,17 @@ class CXSysControl
 	END_MSG_MAP()
 
 public:
-	BOOL Create(CXFrame * pFrameParent, const CRect & rcRect = CRect(0, 0, 0, 0),
-		BOOL bVisible = FALSE, WIDTH_MODE aWidthMode = WIDTH_MODE_NOT_CHANGE, HEIGHT_MODE aHeightMode = HEIGHT_MODE_NOT_CHANGE);
+	BOOL Create(CXFrame * pFrameParent, LayoutParam * pLayout,  VISIBILITY visibility = VISIBILITY_NONE);
 
 public:
+	virtual BOOL SetRect(const CRect & rcNewFrameRect);
+
 	virtual VOID Destroy();
 
 	virtual CXFrame * RemoveFrame(UINT nIndex);
 	virtual BOOL InsertFrame(CXFrame * pFrame, UINT nIndex);
-
-	virtual BOOL SetWidthHeightMode(WIDTH_MODE aWidthMode, HEIGHT_MODE aHeightMode);
 	
-	virtual BOOL SetVisible(BOOL bVisible);
+	virtual BOOL SetVisibility(VISIBILITY visibility);
 	
 	virtual IXImage * SetBackground(IXImage * pDrawBackground);
 	
@@ -52,7 +51,7 @@ public:
 protected:
 	virtual VOID OnDetachedFromParent();
 	virtual VOID OnAttachedToParent(CXFrame *pParent);
-	virtual VOID ChangeFrameRect(const CRect & rcNewFrameRect);
+	
 	
 
 private:

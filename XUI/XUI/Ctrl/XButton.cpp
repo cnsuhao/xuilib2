@@ -10,6 +10,17 @@ CXFrame * CXButton::CreateFrameFromXML(X_XML_NODE_TYPE xml, CXFrame *pParent)
 {
  	if (!xml)
  		return NULL;
+
+	LayoutParam *pLayout = pParent ?
+		pParent->GenerateLayoutParam(xml) : new CXFrame::LayoutParam(xml);
+	if (!pLayout)
+	{
+		CStringA strError;
+		strError.Format("WARNING: Generating the layout parameter for the parent %s failed. \
+						Building the frame failed. ", XLibST2A(pParent->GetName()));
+		CXFrameXMLFactory::ReportError(strError);
+		return NULL;
+	}
  
 	X_XML_ATTR_TYPE attr = NULL;
 
@@ -27,8 +38,7 @@ CXFrame * CXButton::CreateFrameFromXML(X_XML_NODE_TYPE xml, CXFrame *pParent)
 		bDisabled = TRUE;
 
  	CXButton *pFrame = new CXButton();
-	pFrame->Create(pParent, CXFrameXMLFactory::BuildRect(xml), FALSE,
-		bDisabled, pFace, (CXFrame::WIDTH_MODE)CXFrameXMLFactory::GetWidthMode(xml), (CXFrame::HEIGHT_MODE)CXFrameXMLFactory::GetHeightMode(xml));
+	pFrame->Create(pParent, pLayout, VISIBILITY_NONE, bDisabled, pFace);
 
  	return pFrame;
 }
@@ -41,11 +51,16 @@ CXButton::CXButton(void)
 {
 }
 
-BOOL CXButton::Create(  CXFrame * pFrameParent, const CRect &rc /*= CRect(0, 0, 0, 0)*/, BOOL bVisible /*= FALSE*/ ,
-					  BOOL bDisabled /* = FALSE*/, IXImage *pBackground /*= NULL*/, 
-					  WIDTH_MODE aWidthMode /*= WIDTH_MODE_NOT_CHANGE*/, HEIGHT_MODE aHeightMode/* = HEIGHT_MODE_NOT_CHANGE*/)
+BOOL CXButton::Create(  CXFrame * pFrameParent, LayoutParam * pLayout,  VISIBILITY visibility /*= VISIBILITY_NONE*/ ,
+					  BOOL bDisabled /* = FALSE*/, IXImage *pBackground /*= NULL*/ )
 {
-	BOOL bRtn = __super::Create(pFrameParent, rc, bVisible, aWidthMode, aHeightMode);
+	if (!pLayout) 
+	{
+		ATLASSERT(!_T("No layout parameter. "));
+		return FALSE;
+	}
+
+	BOOL bRtn = __super::Create(pFrameParent, pLayout, visibility);
 
 	m_bDisabled = bDisabled;
 
@@ -168,7 +183,59 @@ BOOL CXButton::EnableButton( BOOL bEnable /*= TRUE*/ )
 	return TRUE;
 }
 
-INT CXButton::CalculateAdaptBackgroundWidth()
+BOOL CXButton::OnMeasureWidth( const MeasureParam & param )
 {
-	return __super::CalculateAdaptBackgroundWidth() / 4;
+	if (param.m_Spec != MeasureParam::MEASURE_ATMOST
+		&& param.m_Spec != MeasureParam::MEASURE_UNRESTRICTED )
+		return __super::OnMeasureWidth(param);
+
+	IXImage *pBg = GetBackground();
+	int nWrapSize = 0;
+	if (pBg) nWrapSize = pBg->GetImageWidth() / 4;
+
+	if (param.m_Spec == MeasureParam::MEASURE_ATMOST)
+		nWrapSize = min(nWrapSize, param.m_nNum);
+	
+	MeasureParam WrapParam;
+	WrapParam.m_Spec = MeasureParam::MEASURE_EXACT;
+	WrapParam.m_nNum = nWrapSize;
+
+	return __super::OnMeasureWidth(WrapParam);
 }
+
+BOOL CXButton::OnMeasureHeight( const MeasureParam & param )
+{
+	if (param.m_Spec != MeasureParam::MEASURE_ATMOST
+		&& param.m_Spec != MeasureParam::MEASURE_UNRESTRICTED )
+		return __super::OnMeasureHeight(param);
+
+	IXImage *pBg = GetBackground();
+	int nWrapSize = 0;
+	if (pBg) nWrapSize = pBg->GetImageHeight();
+
+	if (param.m_Spec == MeasureParam::MEASURE_ATMOST)
+		nWrapSize = min(nWrapSize, param.m_nNum);
+
+	MeasureParam WrapParam;
+	WrapParam.m_Spec = MeasureParam::MEASURE_EXACT;
+	WrapParam.m_nNum = nWrapSize;
+
+	return __super::OnMeasureHeight(WrapParam);
+}
+
+IXImage * CXButton::SetBackground( IXImage * pDrawBackground )
+
+{
+	IXImage *pImage = __super::SetBackground(pDrawBackground);
+	RefreashButtonFace();
+
+	RequestLayout();
+	
+	return pImage;
+}
+
+BOOL CXButton::OnLayout( const CRect & rcRect )
+{
+	return __super::OnLayout(rcRect);
+}
+

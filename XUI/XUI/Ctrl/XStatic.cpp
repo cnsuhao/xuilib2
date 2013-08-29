@@ -1,5 +1,6 @@
 #include "StdAfx.h"
 #include "XStatic.h"
+#include "..\..\..\XLib\inc\interfaceS\string\StringCode.h"
 
 X_IMPLEMENT_FRAME_XML_RUNTIME(CXStatic)
 
@@ -8,22 +9,30 @@ CXFrame * CXStatic::CreateFrameFromXML(X_XML_NODE_TYPE xml, CXFrame *pParent)
 	if (!xml)
 		return NULL;
 
+	LayoutParam *pLayout = pParent ?
+		pParent->GenerateLayoutParam(xml) : new CXFrame::LayoutParam(xml);
+	if (!pLayout)
+	{
+		CStringA strError;
+		strError.Format("WARNING: Generating the layout parameter for the parent %s failed. \
+						Building the frame failed. ", XLibST2A(pParent->GetName()));
+		CXFrameXMLFactory::ReportError(strError);
+		return NULL;
+	}
+
 	X_XML_ATTR_TYPE attr = NULL;
 
 	IXText *pText = CXFrameXMLFactory::BuildText(xml);
 
-
 	CXStatic *pStatic = new CXStatic();
-	pStatic->Create(pParent, CXFrameXMLFactory::BuildRect(xml), FALSE,
-		pText,
-		(CXFrame::WIDTH_MODE)CXFrameXMLFactory::GetWidthMode(xml),
-		(CXFrame::HEIGHT_MODE)CXFrameXMLFactory::GetHeightMode(xml));
+	pStatic->Create(pParent, pLayout, VISIBILITY_NONE, pText);
 
 	return pStatic;
 }
 
 CXStatic::CXStatic(void)
-	: m_pText(NULL)
+	: m_pText(NULL),
+	m_nMeasredHeight(0)
 {
 }
 
@@ -64,21 +73,27 @@ CString CXStatic::GetText()
 	return m_pText->GetText();
 }
 
-VOID CXStatic::ChangeFrameRect( const CRect & rcNewFrameRect )
+BOOL CXStatic::SetRect( const CRect & rcNewFrameRect )
 {
 	if (GetRect() == rcNewFrameRect)
-		return;
+		return TRUE;
 
 	if (m_pText)
 		m_pText->SetDstRect(CRect(0, 0, rcNewFrameRect.Width(), rcNewFrameRect.Height()));
 
-	__super::ChangeFrameRect(rcNewFrameRect);
+	return __super::SetRect(rcNewFrameRect);
 }
 	
-BOOL CXStatic::Create( CXFrame * pFrameParent, const CRect & rcRect /*= CRect(0, 0, 0, 0)*/, BOOL bVisible /*= FALSE*/, 
-					  IXText *pText /*= NULL*/, WIDTH_MODE aWidthMode /*= WIDTH_MODE_NOT_CHANGE*/, HEIGHT_MODE aHeightMode /*= HEIGHT_MODE_NOT_CHANGE*/ )
+BOOL CXStatic::Create( CXFrame * pFrameParent, LayoutParam * pLayout,  VISIBILITY visibility /*= VISIBILITY_NONE*/, 
+					  IXText *pText /*= NULL*/)
 {
-	BOOL bRtn =  __super::Create(pFrameParent, rcRect, bVisible, aWidthMode, aHeightMode);
+	if (!pLayout) 
+	{
+		ATLASSERT(!_T("No layout parameter. "));
+		return FALSE;
+	}
+
+	BOOL bRtn =  __super::Create(pFrameParent, pLayout, visibility);
 
 	delete SetText(pText);
 
@@ -89,5 +104,62 @@ VOID CXStatic::Destroy()
 {
 	delete SetText(NULL);
 
+	m_nMeasredHeight = -1;
+
 	__super::Destroy();
+}
+
+BOOL CXStatic::OnMeasureWidth( const MeasureParam & param )
+{
+	BOOL bRtn = __super::OnMeasureWidth(param);
+
+	if (!m_pText)
+		return bRtn;
+
+	HDC dc = GetDC();
+
+	CSize szText(0, 0);
+
+	int nMeasured = GetMeasuredWidth();
+
+	if (param.m_Spec != MeasureParam::MEASURE_EXACT)
+	{
+		if (param.m_Spec == MeasureParam::MEASURE_ATMOST)
+			szText = m_pText->Measure(dc, param.m_nNum);
+		else
+			szText = m_pText->Measure(dc);
+
+		SetMeasuredWidth(max(nMeasured, szText.cx));
+	}
+	else
+		szText = m_pText->Measure(dc, nMeasured);
+
+	m_nMeasredHeight = szText.cy;
+
+	ReleaseDC(dc, FALSE);
+
+	return bRtn;
+}
+
+BOOL CXStatic::OnMeasureHeight( const MeasureParam & param )
+{
+	BOOL bRtn = __super::OnMeasureHeight(param);
+
+	if (!m_pText)
+		return bRtn;
+
+	if (param.m_Spec != MeasureParam::MEASURE_EXACT)
+	{
+		int nMeasured = GetMeasuredHeight();
+		nMeasured = max(nMeasured, m_nMeasredHeight);
+		
+		if (param.m_Spec == MeasureParam::MEASURE_ATMOST)
+			nMeasured = min(nMeasured, param.m_nNum);
+
+		SetMeasuredHeight(nMeasured);
+	}
+
+	m_nMeasredHeight = 0;
+
+	return bRtn;
 }

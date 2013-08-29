@@ -1,5 +1,6 @@
 #include "StdAfx.h"
 #include "XDock.h"
+#include "..\..\..\XLib\inc\interfaceS\string\StringCode.h"
 
 X_IMPLEMENT_FRAME_XML_RUNTIME(CXDock)
 
@@ -7,6 +8,18 @@ CXFrame * CXDock::CreateFrameFromXML(X_XML_NODE_TYPE xml, CXFrame *pParent)
 {
  	if (!xml)
  		return NULL;
+	
+	LayoutParam *pLayout = pParent ?
+		pParent->GenerateLayoutParam(xml) : new CXFrame::LayoutParam(xml);
+
+	if (!pLayout)
+	{
+		CStringA strError;
+		strError.Format("WARNING: Generating the layout parameter for the parent %s failed. \
+						Building the frame failed. ", XLibST2A(pParent->GetName()));
+		CXFrameXMLFactory::ReportError(strError);
+		return NULL;
+	}
 
 	X_XML_ATTR_TYPE attr = NULL;
 
@@ -38,282 +51,15 @@ CXFrame * CXDock::CreateFrameFromXML(X_XML_NODE_TYPE xml, CXFrame *pParent)
 	}
 
 	CXDock *pDock = new CXDock();
-	pDock->Create(pParent, eDockType, eAlignType, CXFrameXMLFactory::BuildRect(xml), FALSE,
-		(CXFrame::WIDTH_MODE)CXFrameXMLFactory::GetWidthMode(xml),
-		(CXFrame::HEIGHT_MODE)CXFrameXMLFactory::GetHeightMode(xml));
+	pDock->Create(pParent, eDockType, eAlignType, pLayout, VISIBILITY_NONE);
 
 	return pDock;
 }
 
 CXDock::CXDock()
 	: m_DockType(DOCK_LEFT2RIGHT), 
-	m_Align(ALIGN_LOW),
-	m_bListenChildFrameRectMarginChange(TRUE)
+	m_Align(ALIGN_LOW)
 {
-}
-
-BOOL CXDock::InsertFrame( CXFrame * pFrame, UINT nIndex )
-{
- 	if (!pFrame)
- 		return FALSE;
- 
- 	BOOL bIsFrameVisible = pFrame->IsVisible();
- 	pFrame->SetVisible(FALSE);
-
-	__super::InsertFrame(pFrame, nIndex);
- 
- 	RelayoutFrom(nIndex);
- 
- 	pFrame->SetVisible(bIsFrameVisible);
-
-	pFrame->AddEventListener(this);
- 
- 	return TRUE;
-}
-
-CXFrame * CXDock::RemoveFrame( UINT nIndex )
-{
-	CXFrame *pFrame = GetFrameByIndex(nIndex);
-
- 	if (!pFrame)
- 		return NULL;
-
-	pFrame->RemoveEventListener(this);
-	pFrame = __super::RemoveFrame(nIndex);
-
-	RelayoutFrom(nIndex);
- 
-	return pFrame;
-}
-
-VOID CXDock::RelayoutFrom( UINT nIndex )
-{
-	const UINT nFrameCount = GetFrameCount();
-
-	if (nIndex >= nFrameCount)
-		return;
-
-	ThrowEvent(EVENT_DOCK_ITEMS_REDOCK_BEGIN, nIndex, 0);
-
-	const CRect rcDock(GetRect());
-	
-	INT nStartPos = 0;
-
-	if (m_DockType == DOCK_LEFT2RIGHT || m_DockType == DOCK_TOP2BOTTOM)
-		nStartPos = 0;
-	else if (m_DockType == DOCK_RIGHT2LEFT)
-		nStartPos = rcDock.Width();
-	else if (m_DockType == DOCK_BOTTOM2TOP)
-		nStartPos = rcDock.Height();
-
-	for (UINT i = nIndex; i < nFrameCount; i++)
-	{
-		if (i == nIndex && i > 0)
-		{
-			CXFrame *pLastHoldPlaceFrame = NULL;
-			UINT j = i;
-			do 
-			{
-				j--;
-				CXFrame *p = GetFrameByIndex(j);
-				if (p && p->IsHoldPlace())
-				{
-					pLastHoldPlaceFrame = p;
-					break;
-				}
-			} while (j > 0);
-
-			if (pLastHoldPlaceFrame)
-			{
-				CRect rcLastHoldPlaceFrameRect(pLastHoldPlaceFrame->GetRect());
-				CRect rcLastHoldPlaceFrameMargin(pLastHoldPlaceFrame->GetMargin());
-
-				if (m_DockType == DOCK_LEFT2RIGHT)
-					nStartPos = rcLastHoldPlaceFrameRect.right + rcLastHoldPlaceFrameMargin.right;
-				else if (m_DockType == DOCK_TOP2BOTTOM)
-					nStartPos = rcLastHoldPlaceFrameRect.bottom + rcLastHoldPlaceFrameMargin.bottom;
-				else if (m_DockType == DOCK_RIGHT2LEFT)
-					nStartPos = rcLastHoldPlaceFrameRect.left - rcLastHoldPlaceFrameMargin.left;
-				else if (m_DockType == DOCK_BOTTOM2TOP)
-					nStartPos = rcLastHoldPlaceFrameRect.top - rcLastHoldPlaceFrameMargin.top;
-			}
-		}
-
-		CXFrame *pFrameToLay = GetFrameByIndex(i);
-		if (!pFrameToLay)
-		{
-			ATLASSERT(NULL);
-			continue;
-		}
-
-		if ((m_DockType == DOCK_LEFT2RIGHT || m_DockType == DOCK_RIGHT2LEFT) && 
-			pFrameToLay->GetWidthMode() == WIDTH_MODE_REACH_PARENT)
-		{
-			pFrameToLay->SetWidthHeightMode(CXFrame::WIDTH_MODE_NORMAL, CXFrame::HEIGHT_MODE_NOT_CHANGE);
-			ATLASSERT(!_T("L2R or R2L dock can't own a frame with a WIDTH_MODE_REACH_PARENT. "));
-		}
-		if ((m_DockType == DOCK_TOP2BOTTOM || m_DockType == DOCK_BOTTOM2TOP) &&
-			pFrameToLay->GetHeightMode() == HEIGHT_MODE_REACH_PARENT)
-		{
-			pFrameToLay->SetWidthHeightMode(CXFrame::WIDTH_MODE_NOT_CHANGE, CXFrame::HEIGHT_MODE_NORMAL);
-			ATLASSERT(!_T("T2B or B2T dock can't own a frame with a HEIGHT_MODE_REACH_PARENT. "));
-		}
-
-		CRect rcSrcFrameToLay(pFrameToLay->GetRect());
-		CSize szSizeFrameToLay(rcSrcFrameToLay.Size());
-		CRect rcMarginFrameToLay(pFrameToLay->GetMargin());
-		CRect rcTargetFrameToLay(0, 0, 0, 0);
-
-		if (m_DockType == DOCK_LEFT2RIGHT)
-		{
-			rcTargetFrameToLay.left = nStartPos + rcMarginFrameToLay.left;
-			rcTargetFrameToLay.right = rcTargetFrameToLay.left + szSizeFrameToLay.cx;
-			nStartPos = rcTargetFrameToLay.right + rcMarginFrameToLay.right;
-		}
-		else if (m_DockType == DOCK_TOP2BOTTOM)
-		{
-			rcTargetFrameToLay.top = nStartPos + rcMarginFrameToLay.top;
-			rcTargetFrameToLay.bottom = rcTargetFrameToLay.top + szSizeFrameToLay.cy;
-			nStartPos = rcTargetFrameToLay.bottom + rcMarginFrameToLay.bottom;
-		}
-		else if (m_DockType == DOCK_RIGHT2LEFT)
-		{
-			rcTargetFrameToLay.right = nStartPos - rcMarginFrameToLay.right;
-			rcTargetFrameToLay.left = rcTargetFrameToLay.right - szSizeFrameToLay.cx;
-			nStartPos = rcTargetFrameToLay.left - rcMarginFrameToLay.left;
-		}
-		else if (m_DockType == DOCK_BOTTOM2TOP)
-		{
-			rcTargetFrameToLay.bottom = nStartPos - rcMarginFrameToLay.bottom;
-			rcTargetFrameToLay.top = rcTargetFrameToLay.bottom - szSizeFrameToLay.cy;
-			nStartPos = rcTargetFrameToLay.top - rcMarginFrameToLay.top;
-		}
-
-		if (pFrameToLay->GetWidthMode() == WIDTH_MODE_REACH_PARENT)
-			rcTargetFrameToLay.left = rcTargetFrameToLay.right = 0;
-		else if (pFrameToLay->GetHeightMode() == HEIGHT_MODE_REACH_PARENT)
-			rcTargetFrameToLay.top = rcTargetFrameToLay.bottom = 0;
-		else if (m_Align == ALIGN_LOW)
-		{
-			if (m_DockType == DOCK_LEFT2RIGHT || m_DockType == DOCK_RIGHT2LEFT)
-			{
-				rcTargetFrameToLay.top = rcMarginFrameToLay.top;
-				rcTargetFrameToLay.bottom = rcTargetFrameToLay.top + szSizeFrameToLay.cy;
-			}
-			else
-			{
-				rcTargetFrameToLay.left = rcMarginFrameToLay.left;
-				rcTargetFrameToLay.right = rcTargetFrameToLay.left + szSizeFrameToLay.cx;
-			}
-		}
-		else if (m_Align == ALIGN_MIDDLE)
-		{
-			if (m_DockType == DOCK_LEFT2RIGHT || m_DockType == DOCK_RIGHT2LEFT)
-			{
-				rcTargetFrameToLay.top = (rcDock.Height() - szSizeFrameToLay.cy) / 2;
-				rcTargetFrameToLay.bottom = rcTargetFrameToLay.top + szSizeFrameToLay.cy;
-			}
-			else
-			{
-				rcTargetFrameToLay.left = (rcDock.Width() - szSizeFrameToLay.cx) / 2;
-				rcTargetFrameToLay.right = rcTargetFrameToLay.left + szSizeFrameToLay.cx;
-			}
-		}
-		else if (m_Align == ALIGN_HIGH)
-		{
-			if (m_DockType == DOCK_LEFT2RIGHT || m_DockType == DOCK_RIGHT2LEFT)
-			{
-				rcTargetFrameToLay.bottom = rcDock.Height() - rcMarginFrameToLay.bottom;
-				rcTargetFrameToLay.top = rcTargetFrameToLay.bottom - szSizeFrameToLay.cy;
-			}
-			else
-			{
-				rcTargetFrameToLay.right = rcDock.Width() - rcMarginFrameToLay.right;
-				rcTargetFrameToLay.left = rcTargetFrameToLay.right - szSizeFrameToLay.cx;
-			}
-		}
-
-		if (rcSrcFrameToLay.TopLeft() != rcTargetFrameToLay.TopLeft())
-		{
-			m_bListenChildFrameRectMarginChange = FALSE;
-			pFrameToLay->Move(rcTargetFrameToLay.TopLeft());
-			m_bListenChildFrameRectMarginChange = TRUE;
-		}
-	}
-
-
-	ThrowEvent(EVENT_DOCK_ITEMS_REDOCKED, nIndex, 0);
-}
-
-VOID CXDock::OnChildFrameRectChanged(CXFrame *pSrcFrame, UINT uEvent, WPARAM wParam, LPARAM lParam, BOOL& bHandled)
-{
-	if (!m_bListenChildFrameRectMarginChange)
-		return;
-
-	if (!pSrcFrame)
-		return;
-
-	UINT nFrameIndex = GetFrameIndex(pSrcFrame);
-	if (nFrameIndex == INVALID_FRAME_INDEX)
-		return;
-
-	RelayoutFrom(nFrameIndex);
-}
-
-VOID CXDock::OnChildFrameMarginChanged(CXFrame *pSrcFrame, UINT uEvent, WPARAM wParam, LPARAM lParam, BOOL& bHandled )
-{
-	if (!m_bListenChildFrameRectMarginChange)
-		return;
-
-	if (!pSrcFrame)
-		return;
-
-	UINT nFrameIndex = GetFrameIndex(pSrcFrame);
-	if (nFrameIndex == INVALID_FRAME_INDEX)
-		return;
-
-	RelayoutFrom(nFrameIndex);
-}
-
-
-VOID CXDock::OnChildFrameHoldPlaceStateChanged( CXFrame *pSrcFrame, UINT uEvent, WPARAM wParam, LPARAM lParam, BOOL& bHandled )
-{
-	if (!pSrcFrame)
-		return;
-
-	UINT nFrameIndex = GetFrameIndex(pSrcFrame);
-	if (nFrameIndex == INVALID_FRAME_INDEX)
-		return;
-
-	RelayoutFrom(nFrameIndex);
-}
-
-
-VOID CXDock::ChangeFrameRect( const CRect & rcNewFrameRect )
-{
-	CRect rcFrameOld(GetRect());
-
-	if (rcFrameOld == rcNewFrameRect)
-		return;
-
-	__super::ChangeFrameRect(rcNewFrameRect);
-
-	BOOL bWidthChange = rcNewFrameRect.Width() != rcFrameOld.Width();
-	BOOL bHeightChange = rcNewFrameRect.Height() != rcFrameOld.Height();
-
-	if (m_Align == ALIGN_LOW)
-	{
-		if (m_DockType == DOCK_LEFT2RIGHT || m_DockType == DOCK_TOP2BOTTOM)
-			return;
-
-		if (m_DockType == DOCK_RIGHT2LEFT && !bWidthChange)
-			return;
-
-		if (m_DockType == DOCK_BOTTOM2TOP && !bHeightChange)
-			return;
-	}
-
-	RelayoutFrom(0);
 }
 
 VOID CXDock::Destroy()
@@ -322,17 +68,420 @@ VOID CXDock::Destroy()
 
 	m_DockType = DOCK_LEFT2RIGHT;
 	m_Align = ALIGN_LOW;
-	m_bListenChildFrameRectMarginChange = TRUE;
 }
 
-BOOL CXDock::Create( CXFrame * pFrameParent, DockType dock, Align align, const CRect & rcRect /*= CRect(0, 0, 0, 0)*/, BOOL bVisible /*= FALSE*/, 
-					WIDTH_MODE aWidthMode /*= WIDTH_MODE_NOT_CHANGE*/, HEIGHT_MODE aHeightMode /*= HEIGHT_MODE_NOT_CHANGE*/ )
+BOOL CXDock::Create( CXFrame * pFrameParent, DockType dock, Align align, LayoutParam * pLayout,  VISIBILITY visibility /*= VISIBILITY_NONE*/)
 {
-	BOOL bRtn = __super::Create(pFrameParent, rcRect, bVisible, aWidthMode, aHeightMode);
+	if (!pLayout) 
+	{
+		ATLASSERT(!_T("No layout parameter. "));
+		return FALSE;
+	}
+
+	BOOL bRtn = __super::Create(pFrameParent, pLayout, visibility);
 
 	m_DockType = dock;
 	m_Align = align;
 
 	return bRtn;
+}
+
+BOOL CXDock::OnMeasureWidth( const MeasureParam & param )
+{
+	int nMeasurd = 0;
+
+	if (m_DockType == DOCK_TOP2BOTTOM || m_DockType == DOCK_BOTTOM2TOP)
+		OnMeasureAlignDirection(param, &nMeasurd, 
+			&CXFrame::MeasureWidth, &CXFrame::GetMeasuredWidth, 
+			&LayoutParam::m_nX,
+			&LayoutParam::m_nMarginLeft, &LayoutParam::m_nMarginRight,
+			&LayoutParam::m_nWidth, &LayoutParam::m_mWidth);
+	else
+		OnMeasureLayoutDirection(param, &nMeasurd, 
+			&CXFrame::MeasureWidth, &CXFrame::GetMeasuredWidth, 
+			&LayoutParam::m_nX,
+			&LayoutParam::m_nMarginLeft, &LayoutParam::m_nMarginRight,
+			&LayoutParam::m_nWidth, &LayoutParam::m_mWidth);
+
+	SetMeasuredWidth(nMeasurd);
+
+	return TRUE;
+}
+
+BOOL CXDock::OnMeasureHeight( const MeasureParam & param )
+{
+	int nMeasurd = 0;
+
+	if (m_DockType == DOCK_LEFT2RIGHT || m_DockType == DOCK_RIGHT2LEFT)
+		OnMeasureAlignDirection(param, &nMeasurd,
+			&CXFrame::MeasureHeight, &CXFrame::GetMeasuredHeight, 
+			&LayoutParam::m_nY, 
+			&LayoutParam::m_nMarginTop, &LayoutParam::m_nMarginBottom,
+			&LayoutParam::m_nHeight, &LayoutParam::m_mHeight);
+	else
+		OnMeasureLayoutDirection(param, &nMeasurd,
+			&CXFrame::MeasureHeight, &CXFrame::GetMeasuredHeight, 
+			&LayoutParam::m_nY, 
+			&LayoutParam::m_nMarginTop, &LayoutParam::m_nMarginBottom,
+			&LayoutParam::m_nHeight, &LayoutParam::m_mHeight);
+
+	SetMeasuredHeight(nMeasurd);
+
+	return TRUE;
+}
+BOOL CXDock::OnMeasureAlignDirection( const MeasureParam & param, INT *pMeasuredSize, 
+									 BOOL (CXFrame::*pfChildMeasureProc)(const MeasureParam &), 
+									 INT (CXFrame::*pfChildGetMeasurdProc)(), 
+									 INT LayoutParam::*pLayoutParamPos, 
+									 INT LayoutParam::*pLayoutMarginLow, 
+									 INT LayoutParam::*pLayoutMarginHigh, 
+									 INT LayoutParam::*pnLayoutParamSize, 
+									 LayoutParam::SPECIAL_METRICS LayoutParam::*pmLayoutParamSize )
+{
+	if (!pMeasuredSize || !pfChildMeasureProc || !pfChildGetMeasurdProc ||
+		!pLayoutMarginLow || !pLayoutMarginHigh ||
+		!pLayoutParamPos || !pnLayoutParamSize || !pmLayoutParamSize)
+	{
+		ATLASSERT(NULL);
+		return FALSE;
+	}
+
+	INT & nMeasuredSize = *pMeasuredSize;
+
+	int nMaxSize = 0;
+
+	INT nFrameCount = GetFrameCount();
+	for (INT i = 0; i < nFrameCount; i++)
+	{
+		CXFrame *pCur = GetFrameByIndex(i);
+		if (!pCur)
+		{
+			ATLASSERT(NULL);
+			continue;
+		}
+
+		LayoutParam *pLayoutParam = pCur->GetLayoutParam();
+		if (!pLayoutParam)
+		{
+			ATLASSERT(NULL);
+			continue;
+		}
+
+		if (pCur->GetVisibility() == VISIBILITY_NONE)
+			continue;
+
+		if (pLayoutParam->*pmLayoutParamSize 
+			== LayoutParam::METRIC_REACH_PARENT)
+			continue;
+
+		MeasureParam ParamForMeasure;
+		switch (pLayoutParam->*pmLayoutParamSize)
+		{
+		case LayoutParam::METRIC_WRAP_CONTENT:
+			if (param.m_Spec == MeasureParam::MEASURE_ATMOST ||
+				param.m_Spec == MeasureParam::MEASURE_EXACT)
+			{
+				ParamForMeasure.m_Spec = MeasureParam::MEASURE_ATMOST;
+				ParamForMeasure.m_nNum = max(0, param.m_nNum - 
+					pLayoutParam->*pLayoutMarginLow - pLayoutParam->*pLayoutMarginHigh);
+			}
+			else
+			{
+				ParamForMeasure.m_Spec = MeasureParam::MEASURE_UNRESTRICTED;
+				ParamForMeasure.m_nNum = 0;
+			}
+			break;
+		default:
+			ParamForMeasure.m_Spec = MeasureParam::MEASURE_EXACT;
+			ParamForMeasure.m_nNum = max(0, pLayoutParam->*pnLayoutParamSize);
+			break;
+		}
+
+		(pCur->*pfChildMeasureProc)(ParamForMeasure);
+
+		nMaxSize = max(nMaxSize, 
+			(pCur->*pfChildGetMeasurdProc)() + 
+			pLayoutParam->*pLayoutMarginLow +
+			pLayoutParam->*pLayoutMarginHigh);
+	}
+
+	switch (param.m_Spec)
+	{
+	case MeasureParam::MEASURE_EXACT:
+		nMeasuredSize = param.m_nNum;
+		break;
+	default:
+		nMeasuredSize = nMaxSize;
+		if (param.m_Spec == MeasureParam::MEASURE_ATMOST)
+			nMeasuredSize = min(nMeasuredSize, param.m_nNum);
+		break;
+	}
+
+	for (INT i = 0; i < nFrameCount; i++)
+	{
+		CXFrame *pCur = GetFrameByIndex(i);
+		if (!pCur)
+		{
+			ATLASSERT(NULL);
+			continue;
+		}
+
+		LayoutParam *pLayoutParam = pCur->GetLayoutParam();
+		if (!pLayoutParam)
+		{
+			ATLASSERT(NULL);
+			continue;
+		}
+
+		if (pCur->GetVisibility() == VISIBILITY_NONE)
+			continue;
+
+		if (pLayoutParam->*pmLayoutParamSize 
+			!= LayoutParam::METRIC_REACH_PARENT)
+			continue;
+
+		MeasureParam ParamForMeasure;
+		ParamForMeasure.m_Spec = MeasureParam::MEASURE_EXACT;
+		ParamForMeasure.m_nNum = max(0, 
+			nMeasuredSize - pLayoutParam->*pLayoutMarginLow - pLayoutParam->*pLayoutMarginHigh);
+
+		(pCur->*pfChildMeasureProc)(ParamForMeasure);
+	}
+
+	return TRUE;
+}
+
+
+BOOL CXDock::OnMeasureLayoutDirection( const MeasureParam & param, INT *pMeasuredSize, 
+								BOOL (CXFrame::*pfChildMeasureProc)(const MeasureParam &), 
+								INT (CXFrame::*pfChildGetMeasurdProc)(), 
+								INT LayoutParam::*pLayoutParamPos, 
+								INT LayoutParam::*pLayoutMarginLow,
+								INT LayoutParam::*pLayoutMarginHigh,
+								INT LayoutParam::*pnLayoutParamSize, 
+								LayoutParam::SPECIAL_METRICS LayoutParam::*pmLayoutParamSize)
+{
+	if (!pMeasuredSize || !pfChildMeasureProc || !pfChildGetMeasurdProc ||
+		!pLayoutMarginLow || !pLayoutMarginHigh ||
+		!pLayoutParamPos || !pnLayoutParamSize || !pmLayoutParamSize)
+	{
+		ATLASSERT(NULL);
+		return FALSE;
+	}
+
+	INT & nMeasuredSize = *pMeasuredSize;
+
+	INT nCurrentPos = 0;
+
+	INT nFrameCount = GetFrameCount();
+	for (INT i = 0; i < nFrameCount; i++)
+	{
+		CXFrame *pCur = GetFrameByIndex(i);
+		if (!pCur)
+		{
+			ATLASSERT(NULL);
+			continue;
+		}
+
+		LayoutParam *pLayoutParam = pCur->GetLayoutParam();
+		if (!pLayoutParam)
+		{
+			ATLASSERT(NULL);
+			continue;
+		}
+
+		if (pCur->GetVisibility() == VISIBILITY_NONE)
+			continue;
+
+		MeasureParam ParamForMeasure; 
+
+		switch (pLayoutParam->*pmLayoutParamSize)
+		{
+		case LayoutParam::METRIC_WRAP_CONTENT:
+			if (param.m_Spec == MeasureParam::MEASURE_ATMOST)
+			{
+				ParamForMeasure.m_Spec = MeasureParam::MEASURE_ATMOST;
+				ParamForMeasure.m_nNum = max(0, 
+					param.m_nNum - nCurrentPos - 
+					pLayoutParam->*pLayoutMarginLow - pLayoutParam->*pLayoutMarginHigh);
+			}
+			else
+			{
+				ParamForMeasure.m_Spec = MeasureParam::MEASURE_UNRESTRICTED;
+				ParamForMeasure.m_nNum = 0;
+			}
+			break;
+		case LayoutParam::METRIC_REACH_PARENT:
+			ParamForMeasure.m_Spec = MeasureParam::MEASURE_EXACT;
+			if (param.m_Spec == MeasureParam::MEASURE_EXACT)
+				ParamForMeasure.m_nNum = max(0, 
+					param.m_nNum - nCurrentPos - 
+					pLayoutParam->*pLayoutMarginLow - pLayoutParam->*pLayoutMarginHigh);
+			else
+				ParamForMeasure.m_nNum = 0;
+			break;
+		default:
+			ParamForMeasure.m_Spec = MeasureParam::MEASURE_EXACT;
+			ParamForMeasure.m_nNum = max(0, pLayoutParam->*pnLayoutParamSize);
+			break;
+		}
+
+		(pCur->*pfChildMeasureProc)(ParamForMeasure);
+
+		nCurrentPos = nCurrentPos + (pCur->*pfChildGetMeasurdProc)() +
+			pLayoutParam->*pLayoutMarginLow + pLayoutParam->*pLayoutMarginHigh;
+	}
+
+	switch (param.m_Spec)
+	{
+	case MeasureParam::MEASURE_EXACT:
+		nMeasuredSize = param.m_nNum;
+		break;
+	default:
+		nMeasuredSize = nCurrentPos;
+		if (param.m_Spec == MeasureParam::MEASURE_ATMOST)
+			nMeasuredSize = min(nMeasuredSize, param.m_nNum);
+		break;
+	}
+
+	return TRUE;
+}
+
+BOOL CXDock::OnLayout( const CRect & rcRect )
+{
+	INT nDirection = 0;
+	INT nCurrentPos = 0;
+	LONG CRect::*pLayoutDirectionStart = NULL;
+	LONG CRect::*pLayoutDirectionEnd = NULL;
+	INT LayoutParam::*pLayoutDirectionMarginStart = NULL;
+	INT LayoutParam::*pLayoutDirectionMarginEnd = NULL;
+	LONG CRect::*pAlignDirectionLow = NULL;
+	LONG CRect::*pAlignDirectionHigh = NULL;
+	INT (CXFrame::*pfnLayoutDirectionSize)() = NULL;
+	INT (CXFrame::*pfnAlignDirectionSize)() = NULL;
+	INT LayoutParam::*pAlignDirectionMarginStart = NULL;
+	INT LayoutParam::*pAlignDirectionMarginEnd = NULL;
+
+	INT nAlignDirectionSize = 0;
+
+	switch (m_DockType)
+	{
+	case DOCK_LEFT2RIGHT:
+		nDirection = 1;
+		nCurrentPos = 0;
+		pLayoutDirectionStart = &CRect::left;
+		pLayoutDirectionEnd = &CRect::right;
+		pLayoutDirectionMarginStart = &LayoutParam::m_nMarginLeft;
+		pLayoutDirectionMarginEnd = &LayoutParam::m_nMarginRight;
+		pAlignDirectionMarginStart = &LayoutParam::m_nMarginTop;
+		pAlignDirectionMarginEnd = &LayoutParam::m_nMarginBottom;
+		pAlignDirectionLow = &CRect::top;
+		pAlignDirectionHigh = &CRect::bottom;
+		pfnLayoutDirectionSize = &CXFrame::GetMeasuredWidth;
+		pfnAlignDirectionSize = &CXFrame::GetMeasuredHeight;
+		nAlignDirectionSize = rcRect.Height();
+		break;
+	case DOCK_RIGHT2LEFT:
+		nDirection = -1;
+		nCurrentPos = GetMeasuredWidth();
+		pLayoutDirectionStart = &CRect::right;
+		pLayoutDirectionEnd = &CRect::left;
+		pLayoutDirectionMarginStart = &LayoutParam::m_nMarginRight;
+		pLayoutDirectionMarginEnd = &LayoutParam::m_nMarginLeft;
+		pAlignDirectionMarginStart = &LayoutParam::m_nMarginTop;
+		pAlignDirectionMarginEnd = &LayoutParam::m_nMarginBottom;
+		pAlignDirectionLow = &CRect::top;
+		pAlignDirectionHigh = &CRect::bottom;
+		pfnLayoutDirectionSize = &CXFrame::GetMeasuredWidth;
+		pfnAlignDirectionSize = &CXFrame::GetMeasuredHeight;
+		nAlignDirectionSize = rcRect.Height();
+		break;
+	case DOCK_TOP2BOTTOM:
+		nDirection = 1;
+		nCurrentPos = 0;
+		pLayoutDirectionStart = &CRect::top;
+		pLayoutDirectionEnd = &CRect::bottom;
+		pLayoutDirectionMarginStart = &LayoutParam::m_nMarginTop;
+		pLayoutDirectionMarginEnd = &LayoutParam::m_nMarginBottom;
+		pAlignDirectionMarginStart = &LayoutParam::m_nMarginLeft;
+		pAlignDirectionMarginEnd = &LayoutParam::m_nMarginRight;
+		pAlignDirectionLow = &CRect::left;
+		pAlignDirectionHigh = &CRect::right;
+		pfnLayoutDirectionSize = &CXFrame::GetMeasuredHeight;
+		pfnAlignDirectionSize = &CXFrame::GetMeasuredWidth;
+		nAlignDirectionSize = rcRect.Width();
+		break;
+	case DOCK_BOTTOM2TOP:
+		nDirection = -1;
+		nCurrentPos = GetMeasuredHeight();
+		pLayoutDirectionStart = &CRect::bottom;
+		pLayoutDirectionEnd = &CRect::top;
+		pLayoutDirectionMarginStart = &LayoutParam::m_nMarginBottom;
+		pLayoutDirectionMarginEnd = &LayoutParam::m_nMarginTop;
+		pAlignDirectionMarginStart = &LayoutParam::m_nMarginLeft;
+		pAlignDirectionMarginEnd = &LayoutParam::m_nMarginRight;
+		pAlignDirectionLow = &CRect::left;
+		pAlignDirectionHigh = &CRect::right;
+		pfnLayoutDirectionSize = &CXFrame::GetMeasuredHeight;
+		pfnAlignDirectionSize = &CXFrame::GetMeasuredWidth;
+		nAlignDirectionSize = rcRect.Width();
+		break;
+	}
+
+	INT nFrameCount = GetFrameCount();
+	for (INT i = 0; i < nFrameCount; i++)
+	{
+		CXFrame *pCur = GetFrameByIndex(i);
+		if (!pCur)
+		{
+			ATLASSERT(NULL);
+			continue;
+		}
+
+		LayoutParam *pLayoutParam = pCur->GetLayoutParam();
+		if (!pLayoutParam)
+		{
+			ATLASSERT(NULL);
+			continue;
+		}
+
+		if (pCur->GetVisibility() == VISIBILITY_NONE)
+			continue;
+
+		CRect rc;
+		rc.*pLayoutDirectionStart = 
+			nCurrentPos + nDirection * pLayoutParam->*pLayoutDirectionMarginStart;
+		rc.*pLayoutDirectionEnd = 
+			rc.*pLayoutDirectionStart + nDirection * (pCur->*pfnLayoutDirectionSize)();
+		nCurrentPos = rc.*pLayoutDirectionEnd + nDirection * pLayoutParam->*pLayoutDirectionMarginEnd;
+
+		switch (m_Align)
+		{
+		case ALIGN_LOW:
+			rc.*pAlignDirectionLow = pLayoutParam->*pAlignDirectionMarginStart;
+			rc.*pAlignDirectionHigh = rc.*pAlignDirectionLow + (pCur->*pfnAlignDirectionSize)();
+			break;
+
+		case ALIGN_MIDDLE:
+			{
+				INT nSize = (pCur->*pfnAlignDirectionSize)();
+				INT nSizeWithMargin = nSize + pLayoutParam->*pAlignDirectionMarginStart + pLayoutParam->*pAlignDirectionMarginEnd;
+				rc.*pAlignDirectionLow = (nAlignDirectionSize - nSizeWithMargin) / 2 + pLayoutParam->*pAlignDirectionMarginStart;
+				rc.*pAlignDirectionHigh = rc.*pAlignDirectionLow + nSize;
+			}
+			break;
+
+		case ALIGN_HIGH:
+			rc.*pAlignDirectionHigh = nAlignDirectionSize - pLayoutParam->*pAlignDirectionMarginEnd;
+			rc.*pAlignDirectionLow = rc.*pAlignDirectionHigh - (pCur->*pfnAlignDirectionSize)();
+			break;
+		}
+
+		pCur->Layout(rc);
+	}
+
+
+
+	return TRUE;
 }
 

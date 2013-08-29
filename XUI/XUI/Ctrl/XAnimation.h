@@ -15,21 +15,18 @@ class CXAnimation :
 
 public:
 	BOOL Create(CXFrame * pFrameParent, IXImage *pFrames, UINT nFrameCount, UINT nSwitchFrameInterval,
-		const CRect & rcRect = CRect(0, 0, 0, 0), BOOL bVisible = FALSE,
-		WIDTH_MODE aWidthMode = WIDTH_MODE_NOT_CHANGE, HEIGHT_MODE aHeightMode = HEIGHT_MODE_NOT_CHANGE);
+		LayoutParam * pLayout, VISIBILITY visibility = VISIBILITY_NONE);
 
 public:
 	BOOL SetFrames(IXImage *pFrames, UINT nFrameCount);
 	BOOL SetFrameSwitchInterval(UINT nSwitchFrameInterval);
 
 public:
+	virtual BOOL SetRect(const CRect & rcNewFrameRect);
 	virtual BOOL PaintForeground(HDC hDC, const CRect &rect);
 	virtual VOID Destroy();
-
-protected:
-	virtual INT CalculateWrapContentWidth();
-	virtual INT CalculateWrapContentHeight();
-	virtual VOID ChangeFrameRect(const CRect & rcNewFrameRect);
+	virtual BOOL OnMeasureWidth(const MeasureParam & param);
+	virtual BOOL OnMeasureHeight(const MeasureParam & param);
 
 public:
 	LRESULT OnTimer(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled, BOOL& bCancelBabble);

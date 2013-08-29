@@ -35,6 +35,7 @@ BOOL CXMessageService::PostFrameMsg( CXFrame *pFrame, UINT uMsg, WPARAM wParam, 
 	info.rFrame = pFrame;
 
 	m_vPostFrameMsg.push_back(info);
+	m_setPendingMsg.insert(uMsg);
 
 	if (!m_bPostFrameMsgScheduled)
 	{
@@ -66,6 +67,7 @@ LRESULT CXMessageService::OnPostFrameMsg( UINT uMsg, WPARAM wParam, LPARAM lPara
 	}
 
 	m_vPostFrameMsg.clear();
+	m_setPendingMsg.clear();
 
 	return 0;
 }
@@ -167,4 +169,9 @@ CXMessageService & CXMessageService::Instance()
 {
 	static CXMessageService instance;
 	return instance;
+}
+
+BOOL CXMessageService::HasPendingMsg( UINT uMsg )
+{
+	return m_setPendingMsg.find(uMsg) != m_setPendingMsg.end();
 }

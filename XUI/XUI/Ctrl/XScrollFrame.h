@@ -1,5 +1,7 @@
 #pragma once
+
 #include "XScrollBar.h"
+#include "XScrollContentContainer.h"
 
 class CXScrollFrame :
 	public CXFrame
@@ -17,25 +19,25 @@ public:
 
 	BEGIN_FRAME_EVENT_MAP(CXScrollFrame)
 		CHAIN_FRAME_EVENT_MAP(CXFrame)
-		FRAME_EVENT_HANDLER(EVENT_FRAME_RECT_CHANGED, OnFrameRectChanged)
 		FRAME_EVENT_FRAME_HANDLER(EVENT_SCROLLBAR_SCROLLCHANGED, m_pScrollH, OnHScroll)
 		FRAME_EVENT_FRAME_HANDLER(EVENT_SCROLLBAR_SCROLLCHANGED, m_pScrollV, OnVScroll)
+		FRAME_EVENT_FRAME_HANDLER(EVENT_FRAME_RECT_CHANGED, m_pFrameView, OnViewRectChanged)
+		FRAME_EVENT_FRAME_HANDLER(EVENT_FRAME_RECT_CHANGED, m_pFrameContent, OnContentRectChanged)
 	END_FRAME_EVENT_MAP()
 
 public:
 	CXScrollFrame(UINT nScrollBar = SCROLL_BAR_H | SCROLL_BAR_V);
 
 public:
-	BOOL Create(CXFrame *pParent, const CRect & rcRect = CRect(0, 0, 0, 0), BOOL bVisible = FALSE,
+	BOOL Create(CXFrame *pParent, LayoutParam * pLayout,  VISIBILITY visibility = VISIBILITY_NONE,
 		IXImage *pScrollHImageBG = NULL, IXImage *pScrollHImageFG = NULL,
-		IXImage *pScrollVImageBG = NULL, IXImage *pScrollVImageFG = NULL,
-		WIDTH_MODE aWidthMode = WIDTH_MODE_NOT_CHANGE, HEIGHT_MODE aHeightMode = HEIGHT_MODE_NOT_CHANGE);
+		IXImage *pScrollVImageBG = NULL, IXImage *pScrollVImageFG = NULL);
 
 public:
 	virtual VOID Destroy();
-
-protected:
-	virtual VOID ChangeFrameRect(const CRect & rcNewFrameRect);
+	virtual BOOL OnMeasureWidth(const MeasureParam & param);
+	virtual BOOL OnMeasureHeight(const MeasureParam & param);
+	virtual BOOL OnLayout(const CRect & rcRect);
 
 public:
 	virtual BOOL HandleXMLChildNodes(X_XML_NODE_TYPE xml);
@@ -46,21 +48,24 @@ public:
 	CXFrame * RemoveContentFrame(UINT nIndex);
 
 public:
-	VOID OnFrameRectChanged(CXFrame *pSrcFrame, UINT uEvent, WPARAM wParam, LPARAM lParam, BOOL& bHandled);
 	VOID OnHScroll(CXFrame *pSrcFrame, UINT uEvent, WPARAM wParam, LPARAM lParam, BOOL& bHandled);
 	VOID OnVScroll(CXFrame *pSrcFrame, UINT uEvent, WPARAM wParam, LPARAM lParam, BOOL& bHandled);
+	VOID OnViewRectChanged(CXFrame *pSrcFrame, UINT uEvent, WPARAM wParam, LPARAM lParam, BOOL& bHandled);
+	VOID OnContentRectChanged(CXFrame *pSrcFrame, UINT uEvent, WPARAM wParam, LPARAM lParam, BOOL& bHandled);
 
 public:
 	LRESULT OnLButtonUp(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled, BOOL& bCancelBabble);
 
 private:
-	VOID UpdateViewAndScrollBars();
+	VOID OnViewOrContentChanged(BOOL (CXScrollBar::*pfnSetLen)(INT), 
+		const CRect &rcOld, const CRect &rcNew);
 
 private:
 	UINT m_nScrollBar;
 
 private:
 	CXFrame *m_pFrameView;
+	CXFrame *m_pFrameContent;
 	CXScrollBar *m_pScrollH;
 	CXScrollBar *m_pScrollV;
 };

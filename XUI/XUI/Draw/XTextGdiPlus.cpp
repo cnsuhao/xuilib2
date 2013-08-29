@@ -234,3 +234,30 @@ CString CXTextGdiPlus::GetText()
 {
 	return m_strText;
 }
+
+static float INFINITY = -log((float)0);
+
+CSize CXTextGdiPlus::Measure( HDC dc, INT nWidthLimit )
+{
+	Gdiplus::Graphics graph(dc);
+
+	graph.SetTextRenderingHint(m_Rendering);
+
+	Gdiplus::FontFamily fontFamily(XLibST2W(m_strFontName));  
+	Gdiplus::Font font(&fontFamily, m_nSize, m_FontStyle, Gdiplus::UnitPixel);  
+	Gdiplus::StringFormat stringformat;
+	stringformat.SetAlignment(m_AlignmentH);
+	stringformat.SetLineAlignment(m_AlignmentV == Gdiplus::StringAlignmentCenter ?
+		Gdiplus::StringAlignmentNear : m_AlignmentV);
+	stringformat.SetFormatFlags(m_FormatFlags);
+	stringformat.SetTrimming(Gdiplus::StringTrimmingEllipsisWord);
+	Gdiplus::SolidBrush brush(Gdiplus::Color(m_cAlpha, m_ColorR, m_ColorG, m_ColorB));
+
+	Gdiplus::RectF rfTargetRect(0, 0, nWidthLimit > 0 ? nWidthLimit : INFINITY, INFINITY);
+	CStringW strTextToDraw(XLibST2W(m_strText));
+
+	Gdiplus::RectF rfBoundRect(0, 0, 0, 0);
+	graph.MeasureString(strTextToDraw, -1, &font, rfTargetRect, &stringformat, &rfBoundRect);
+
+	return CSize(ceil(rfBoundRect.Width), ceil(rfBoundRect.Height));
+}
