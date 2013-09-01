@@ -1,0 +1,18 @@
+v1.0
+------
+First SF version. 
+
+v1.6
+------
+- Touchable and selectable have been supported in XFrame.
+- Correct button behaviors.
+- Correct XML errors.
+- Correct the release version crash. 
+
+v1.6.1
+------
+bug fix.
+
+v2.0.1
+------
+Add layout system. 
