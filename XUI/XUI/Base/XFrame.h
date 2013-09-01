@@ -180,7 +180,7 @@ public:
 	BOOL BeginUpdateLayoutParam(LayoutParam *pLayoutParam);
 	virtual BOOL EndUpdateLayoutParam();
 
-	virtual BOOL RequestLayout();
+	virtual BOOL InvalidateLayout();
 	virtual BOOL IsLayouting();
 
 	BOOL MeasureWidth(const MeasureParam & param);

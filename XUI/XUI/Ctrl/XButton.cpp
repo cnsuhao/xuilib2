@@ -229,7 +229,7 @@ IXImage * CXButton::SetBackground( IXImage * pDrawBackground )
 	IXImage *pImage = __super::SetBackground(pDrawBackground);
 	RefreashButtonFace();
 
-	RequestLayout();
+	InvalidateLayout();
 	
 	return pImage;
 }

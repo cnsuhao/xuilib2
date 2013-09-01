@@ -120,7 +120,7 @@ LRESULT CXWindow::OnSize(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled
 
 	ReleaseBufferDC();
 	__super::SetRect(rcWnd);
-	RequestLayout();
+	InvalidateLayout();
 
 	if (m_bCaptionWidthReachParent || m_bCaptionHeightReachParnet)
 		RefreashCaptionRect();
@@ -726,7 +726,7 @@ BOOL CXWindow::SetRect( const CRect & rcNewFrameRect )
 	else
 	{
 		return __super::SetRect(rcNewFrameRect);
-		RequestLayout();
+		InvalidateLayout();
 	}
 }
 
@@ -775,7 +775,7 @@ BOOL CXWindow::EndUpdateLayoutParam()
 	return TRUE;
 }
 
-BOOL CXWindow::RequestLayout()
+BOOL CXWindow::InvalidateLayout()
 {
 	if (m_bLayoutScheduled)
 		return TRUE;

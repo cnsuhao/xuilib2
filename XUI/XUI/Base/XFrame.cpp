@@ -190,7 +190,7 @@ CXFrame * CXFrame::RemoveFrame( UINT nIndex )
 	case VISIBILITY_SHOW:
 		InvalidateRect(pFrame->GetRect());
 	case VISIBILITY_HIDE:
-		RequestLayout();
+		InvalidateLayout();
 	}
 
 	return pFrame;
@@ -217,10 +217,10 @@ BOOL CXFrame::InsertFrame(CXFrame * pFrame, UINT nIndex)
 	switch (visibility)
 	{
 	case VISIBILITY_HIDE:
-		RequestLayout();
+		InvalidateLayout();
 		break;
 	case VISIBILITY_SHOW:
-		RequestLayout();
+		InvalidateLayout();
 		pFrame->InvalidateAfterLayout();
 		break;
 	}
@@ -326,7 +326,7 @@ BOOL CXFrame::SetVisibility( VISIBILITY visibility )
 	case VISIBILITY_SHOW:
 		if (OldVisibility == VISIBILITY_NONE && m_pFrameParent)
 		{
-			m_pFrameParent->RequestLayout();
+			m_pFrameParent->InvalidateLayout();
 			InvalidateAfterLayout();
 		}
 		else
@@ -336,7 +336,7 @@ BOOL CXFrame::SetVisibility( VISIBILITY visibility )
 	case VISIBILITY_HIDE:
 		if (OldVisibility == VISIBILITY_NONE)
 		{
-			if (m_pFrameParent) m_pFrameParent->RequestLayout();
+			if (m_pFrameParent) m_pFrameParent->InvalidateLayout();
 		}
 		else
 		{
@@ -347,7 +347,7 @@ BOOL CXFrame::SetVisibility( VISIBILITY visibility )
 	case VISIBILITY_NONE:
 		if (OldVisibility == VISIBILITY_SHOW)
 			if (m_pFrameParent) m_pFrameParent->InvalidateRect(m_rcFrame);
-		if (m_pFrameParent) m_pFrameParent->RequestLayout();
+		if (m_pFrameParent) m_pFrameParent->InvalidateLayout();
 		break;
 	}
 
@@ -374,7 +374,7 @@ BOOL CXFrame::Update()
 }
 
 
-BOOL CXFrame::RequestLayout()
+BOOL CXFrame::InvalidateLayout()
 {
 	m_bLayoutInvaild = TRUE;
 
@@ -382,7 +382,7 @@ BOOL CXFrame::RequestLayout()
  	if (!pFrameParent)
  		return TRUE;
  
- 	return pFrameParent->RequestLayout();
+ 	return pFrameParent->InvalidateLayout();
 }
 
 
@@ -1355,7 +1355,7 @@ BOOL CXFrame::EndUpdateLayoutParam()
 	}
 
 	if (m_pFrameParent)
-		m_pFrameParent->RequestLayout();
+		m_pFrameParent->InvalidateLayout();
 
 	return TRUE;
 }

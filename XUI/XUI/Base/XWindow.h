@@ -86,7 +86,7 @@ public:
 
 	virtual BOOL EndUpdateLayoutParam();
 
-	virtual BOOL RequestLayout();
+	virtual BOOL InvalidateLayout();
 	virtual BOOL IsLayouting();
 
 	virtual BOOL InvalidateRect(const CRect & rect);

@@ -111,7 +111,7 @@ BOOL CXAnimation::SetFrames( IXImage *pFrames, UINT nFrameCount )
 
 	m_nCurrentFrame = 0;
 
-	RequestLayout();
+	InvalidateLayout();
 	InvalidateRect();
 
 	return TRUE;
