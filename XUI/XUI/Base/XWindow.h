@@ -17,7 +17,7 @@ public:
 	CXWindow(void);
 
 public:
-	/// 支持子类自定义类名
+	/// window class customization. 
 	virtual LPCTSTR GetClassName(){return _T("XWindow");}
 	ATL::CWndClassInfo GetWndClassInfo();
 	HWND Create(HWND hWndParent,  LayoutParam * pLayout,

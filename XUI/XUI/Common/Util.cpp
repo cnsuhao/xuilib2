@@ -94,7 +94,8 @@ BOOL Util::DrawLine( HDC dc, const CPoint &ptStart, const CPoint &ptEnd, UINT nW
 {
 	Gdiplus::Pen pen(Gdiplus::Color(a, r, g, b), nWidth);
 
-	pen.SetDashStyle(Gdiplus::DashStyleDash);
+	if (bDotted)
+		pen.SetDashStyle(Gdiplus::DashStyleDash);
 
 	Gdiplus::Graphics graph(dc);
 

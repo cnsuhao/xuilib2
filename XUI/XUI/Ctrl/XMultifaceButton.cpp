@@ -31,7 +31,7 @@ CXFrame * CXMultifaceButton::CreateFrameFromXML(X_XML_NODE_TYPE xml, CXFrame *pP
  	if (attr) xml->remove_attribute(attr);
 
 	std::vector<IXImage *> vImageList;
-	CXFrameXMLFactory::BuildImageList(&vImageList, xml, "faces", "face_types_", "stretch", "face_parts_");
+	CXFrameXMLFactory::BuildImageList(&vImageList, xml, "faces", "face_types", "stretch", "face_parts_");
  
  	if (!vImageList.size())
  		CXFrameXMLFactory::ReportError("WARNING: No face specified for the multi-face button, will use default button face. ");
@@ -62,12 +62,6 @@ BOOL CXMultifaceButton::Create(CXFrame * pFrameParent,
 							   LayoutParam * pLayout,  VISIBILITY visibility /*= VISIBILITY_NONE*/, 
 							   UINT nStartButtonFace /*= 0*/, BOOL bDisabled /*= FALSE*/)
 {
-	if (!pLayout) 
-	{
-		ATLASSERT(!_T("No layout parameter. "));
-		return NULL;
-	}
-
 	if (pButtonFaces && nButtonFaceCount > 0)
 		m_vButtonFaces.insert(m_vButtonFaces.end(), pButtonFaces, pButtonFaces + nButtonFaceCount);
 

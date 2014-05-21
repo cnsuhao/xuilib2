@@ -194,7 +194,7 @@ VOID CXFrameXMLFactory::BuildImageList( std::vector<IXImage *> *pVecImageList,
 		}
 
 		const char *pType = "";
-		if (i < vTypeList.size())
+		if (i < vTypeList.size() && vTypeList[i].GetLength())
 			pType = vTypeList[i];
 		else if (!pImage->IsFormattedImage())
 			pType = pDefaultType ? pDefaultType : "normal";
@@ -215,10 +215,14 @@ VOID CXFrameXMLFactory::BuildImageList( std::vector<IXImage *> *pVecImageList,
 			
 		CRect rcPartRect(0, 0, pImage->GetImageWidth(), pImage->GetImageHeight());
 		BOOL bHasAttr = FALSE;
-		if (i < vPartLeft.size()) { rcPartRect.left = atoi(vPartLeft[i]); bHasAttr = TRUE; }
-		if (i < vPartTop.size()) { rcPartRect.top = atoi(vPartTop[i]); bHasAttr = TRUE; }
-		if (i < vPartWidth.size()) { rcPartRect.right = rcPartRect.left + atoi(vPartWidth[i]); bHasAttr = TRUE; }
-		if (i < vPartHeight.size()) { rcPartRect.bottom = rcPartRect.top + atoi(vPartHeight[i]); bHasAttr = TRUE; }
+		if (i < vPartLeft.size() && vPartLeft[i].GetLength()) 
+			{ rcPartRect.left = atoi(vPartLeft[i]); bHasAttr = TRUE; }
+		if (i < vPartTop.size() && vPartTop[i].GetLength()) 
+			{ rcPartRect.top = atoi(vPartTop[i]); bHasAttr = TRUE; }
+		if (i < vPartWidth.size() && vPartWidth[i].GetLength()) 
+			{ rcPartRect.right = rcPartRect.left + atoi(vPartWidth[i]); bHasAttr = TRUE; }
+		if (i < vPartHeight.size() && vPartHeight[i].GetLength()) 
+			{ rcPartRect.bottom = rcPartRect.top + atoi(vPartHeight[i]); bHasAttr = TRUE; }
 		if (bHasAttr)
 			pImage->SetPartRect(rcPartRect);
 
@@ -373,7 +377,7 @@ IXText * CXFrameXMLFactory::BuildText( X_XML_NODE_TYPE xml, const char * pTextPr
 		const char *pValue = attr->value();
 		if (!StrCmpIA(pValue, "center"))
 			align_h = Gdiplus::StringAlignmentCenter;
-		if (!StrCmpIA(pValue, "right"))
+		else if (!StrCmpIA(pValue, "right"))
 			align_h = Gdiplus::StringAlignmentFar;
 	}
 	attr = xml->first_attribute(strTextPrefix + "text_align_v", 0, false);
@@ -382,7 +386,7 @@ IXText * CXFrameXMLFactory::BuildText( X_XML_NODE_TYPE xml, const char * pTextPr
 		const char *pValue = attr->value();
 		if (!StrCmpIA(pValue, "middle"))
 			align_v = Gdiplus::StringAlignmentCenter;
-		if (!StrCmpIA(pValue, "bottom"))
+		else if (!StrCmpIA(pValue, "bottom"))
 			align_v = Gdiplus::StringAlignmentFar;
 	}
 	pText->SetAlignment(align_h, align_v);

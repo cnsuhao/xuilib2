@@ -23,7 +23,7 @@ CXImageGdiPlus::~CXImageGdiPlus(void)
 
 BOOL CXImageGdiPlus::Draw( HDC hDC, const CRect &rcDraw )
 {
-	if (!m_dcBuffer && !RefreashBufferDC(hDC))
+	if (!m_dcBuffer && !RefreshBufferDC(hDC))
 	{
 		return FALSE;
 	}
@@ -45,13 +45,23 @@ BOOL CXImageGdiPlus::Draw( HDC hDC, const CRect &rcDraw )
 
 BOOL CXImageGdiPlus::SetDrawType(DrawImageType dit)
 {
+	if (m_DrawImageType == dit)
+		return TRUE;
+
+	ReleaseBufferDC();
 	m_DrawImageType = dit;
+	
 	return TRUE;
 }
 
 BOOL CXImageGdiPlus::SetPartRect(const CRect &rcPart)
 {
+	if (m_rcPart == rcPart)
+		return TRUE;
+
+	ReleaseBufferDC();
 	m_rcPart = rcPart;
+
 	return TRUE;
 }
 
@@ -182,7 +192,7 @@ VOID CXImageGdiPlus::ReleaseBufferDC()
 	}
 }
 
-BOOL CXImageGdiPlus::RefreashBufferDC(HDC hDCSrc)
+BOOL CXImageGdiPlus::RefreshBufferDC(HDC hDCSrc)
 {
 	ReleaseBufferDC();
 
@@ -233,7 +243,9 @@ BOOL CXImageGdiPlus::SetDstRect( const CRect &rcDst )
 	if (rcDst == m_rcDst)
 		return TRUE;
 
-	ReleaseBufferDC();
+	if (rcDst.Width() != m_rcDst.Width() || rcDst.Height() != m_rcDst.Height())
+		ReleaseBufferDC();
+	
 	m_rcDst = rcDst;
 
 	return TRUE;
@@ -268,7 +280,7 @@ INT CXImageGdiPlus::GetImageWidth()
 
 VOID CXImageGdiPlus::InitSrcRect()
 {
-	m_rcSrc.left = m_rcSrc.right = 0;
+	m_rcSrc.left = m_rcSrc.top = 0;
 	m_rcSrc.right = GetImageWidth();
 	m_rcSrc.bottom = GetImageHeight();
 }
@@ -299,7 +311,7 @@ VOID CXImageGdiPlus::LoadFormattedImageInfo( LPCTSTR szFileName )
 
 VOID CXImageGdiPlus::LoadFormattedImagePartInfo()
 {
-	// 9-part images have 2-pixel borders on each side.   
+	// 9-part images have 1-pixel borders on each side.   
 	const INT nImageWidth = m_Image.GetImageWidth() - 2;
 	const INT nImageHeight = m_Image.GetImageHeight() - 2;
 

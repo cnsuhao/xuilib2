@@ -53,8 +53,11 @@ LRESULT CXMessageService::OnPostFrameMsg( UINT uMsg, WPARAM wParam, LPARAM lPara
 
 	m_bPostFrameMsgScheduled = FALSE;
 
+
+	std::vector<PostFrameMsgInfo>::size_type szLen = m_vPostFrameMsg.size();
+
 	for (std::vector<PostFrameMsgInfo>::size_type i = 0;
-		i < m_vPostFrameMsg.size(); i++)
+		i < szLen; i++)
 	{
 		const PostFrameMsgInfo & info = 
 			m_vPostFrameMsg[i];
@@ -66,8 +69,11 @@ LRESULT CXMessageService::OnPostFrameMsg( UINT uMsg, WPARAM wParam, LPARAM lPara
 			info.rFrame->ProcessFrameMessage(info.uMsg, info.wParam, info.lParam, lUnused, bUnused);
 	}
 
-	m_vPostFrameMsg.clear();
+	m_vPostFrameMsg.erase(m_vPostFrameMsg.begin(), m_vPostFrameMsg.begin() + szLen);
 	m_setPendingMsg.clear();
+	for (std::vector<PostFrameMsgInfo>::size_type i = 0;
+		i < m_vPostFrameMsg.size(); i++)
+		m_setPendingMsg.insert(m_vPostFrameMsg[i].uMsg);
 
 	return 0;
 }

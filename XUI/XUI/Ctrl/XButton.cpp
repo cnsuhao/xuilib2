@@ -54,11 +54,6 @@ CXButton::CXButton(void)
 BOOL CXButton::Create(  CXFrame * pFrameParent, LayoutParam * pLayout,  VISIBILITY visibility /*= VISIBILITY_NONE*/ ,
 					  BOOL bDisabled /* = FALSE*/, IXImage *pBackground /*= NULL*/ )
 {
-	if (!pLayout) 
-	{
-		ATLASSERT(!_T("No layout parameter. "));
-		return FALSE;
-	}
 
 	BOOL bRtn = __super::Create(pFrameParent, pLayout, visibility);
 
@@ -71,7 +66,7 @@ BOOL CXButton::Create(  CXFrame * pFrameParent, LayoutParam * pLayout,  VISIBILI
 
 	delete SetBackground(pBackground);
 
-	RefreashButtonFace();
+//	RefreashButtonFace();
 
 	return bRtn;
 }

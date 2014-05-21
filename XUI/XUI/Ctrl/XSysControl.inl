@@ -2,12 +2,6 @@
 template<class TCtrl>
 BOOL CXSysControl<TCtrl>::Create( CXFrame * pFrameParent, LayoutParam * pLayout, VISIBILITY visibility /*= VISIBILITY_NONE*/)
 {
-	if (!pLayout) 
-	{
-		ATLASSERT(!_T("No layout parameter. "));
-		return FALSE;
-	}
-
 	return __super::Create(NULL, &CRect(0, 0, 0, 0), NULL, WS_POPUP, WS_EX_TOOLWINDOW, 0U, NULL) && 
 		__super::Create(pFrameParent, pLayout, visibility);
 }
@@ -165,10 +159,10 @@ VOID CXSysControl<TCtrl>::OnAncestorShowHide(CXFrame *pSrcFrame, UINT uEvent, WP
 
 	if (!IsWindow())
 		return;
+	
+	VISIBILITY show = (VISIBILITY)wParam;
 
-	BOOL bShow = (BOOL)wParam;
-
-	if (!bShow)
+	if (show != VISIBILITY_SHOW)
 		ShowWindow(SW_HIDE);
 	else
 		UpdateShowState();

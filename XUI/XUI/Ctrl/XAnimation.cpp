@@ -171,12 +171,6 @@ VOID CXAnimation::Destroy()
 BOOL CXAnimation::Create( CXFrame * pFrameParent, IXImage *pFrames, UINT nFrameCount, UINT nSwitchFrameInterval, 
 						 LayoutParam * pLayout,  VISIBILITY visibility /*= VISIBILITY_NONE*/)
 {
-	if (!pLayout) 
-	{
-		ATLASSERT(!_T("No layout parameter. "));
-		return FALSE;
-	}
-
 	BOOL bRtn = __super::Create(pFrameParent, pLayout, visibility);
 
 	SetFrames(pFrames, nFrameCount);

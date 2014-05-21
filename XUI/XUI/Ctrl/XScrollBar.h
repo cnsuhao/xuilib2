@@ -48,6 +48,7 @@ public:
 private:
 	VOID UpdateScrollBar();
 	VOID NotifyScrollChange();
+	INT AdjustScrollPos(INT nPos);
 
 private:
 	ScrollType m_Type;

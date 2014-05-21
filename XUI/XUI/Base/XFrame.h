@@ -143,6 +143,15 @@ public:
 	BOOL SetParent(CXFrame * pFrameParent);
 	CXFrame * GetParent();
 
+	BOOL SetOffsetX(INT x);
+	BOOL SetOffsetY(INT y);
+	BOOL SetScrollX(INT x);
+	BOOL SetScrollY(INT y);
+	INT GetOffsetX();
+	INT GetOffsetY();
+	INT GetScrollX();
+	INT GetScrollY();
+
 	virtual BOOL SetRect(const CRect & rcNewFrameRect);
 	BOOL Move(const CPoint &pt);
 	CRect GetRect();
@@ -174,6 +183,12 @@ public:
 public:
 	virtual LayoutParam * GenerateLayoutParam (LayoutParam *pCopyFrom = NULL);
 	LayoutParam * GenerateLayoutParam (X_XML_NODE_TYPE xml);
+
+	BOOL OpenManualLayoutMode();
+	BOOL CloseManualLayoutMode(LayoutParam *pLayoutParam);
+	BOOL GetManualLayoutMode();
+
+	BOOL NeedLayout();
 
 	LayoutParam * GetLayoutParam();
 	LayoutParam * BeginUpdateLayoutParam();
@@ -275,6 +290,11 @@ private:
 	BOOL FillSelectedLayer();
 
 private:
+	BOOL UpdateOffset(INT nDeltaX, INT nDeltaY);
+	BOOL UpdateScroll(INT nDeltaX, INT nDeltaY);
+	
+
+private:
 	CString m_strFrameName;
 
 	std::vector<CXFrame *> m_vecFrameChild;
@@ -293,6 +313,7 @@ private:
 	BOOL m_bMouseOver;
 	BOOL m_bMouseDown;
 
+	BOOL m_bManualLayoutMode;
 	LayoutParam * m_pLayoutParam;
 	LayoutParam * m_pDelayLayoutParam;
 	BOOL m_bDelayUpdateLayoutParamScheduled;
@@ -300,8 +321,13 @@ private:
 	MeasureParam m_LastMeasureHeightParam;
 	INT m_nMeasuredWidth, m_nMeasuredHeight;
 	BOOL m_bLayoutInvaild;
+	BOOL m_bNeedInvalidateAfterLayout;
 
 	CRect m_rcFrame;
+	INT m_nOffsetX;
+	INT m_nOffsetY;
+	INT m_nScrollX;
+	INT m_nScrollY;
 	VISIBILITY m_Visibility;
 
 	BOOL m_bIsFrameAlive;

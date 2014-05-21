@@ -2,6 +2,8 @@
 
 #include "XScrollFrame.h"
 
+#include "XScrollView.h"
+
 #include "..\..\..\XLib\inc\interfaceS\string\StringCode.h"
 
 X_IMPLEMENT_FRAME_XML_RUNTIME(CXScrollFrame)
@@ -69,7 +71,6 @@ CXScrollFrame::CXScrollFrame(UINT nScrollBar)
 	: m_pScrollH(NULL), 
 	m_pScrollV(NULL),
 	m_pFrameView(NULL),
-	m_pFrameContent(NULL),
 	m_nScrollBar(nScrollBar)
 {
 
@@ -79,11 +80,6 @@ BOOL CXScrollFrame::Create( CXFrame *pParent, LayoutParam * pLayout,  VISIBILITY
 						   IXImage *pScrollHImageBG/* = NULL*/, IXImage *pScrollHImageFG/* = NULL*/,
 						   IXImage *pScrollVImageBG/* = NULL*/, IXImage *pScrollVImageFG/* = NULL*/)
 {
-	if (!pLayout) 
-	{
-		ATLASSERT(!_T("No layout parameter. "));
-		return FALSE;
-	}
 
 	BOOL bRtn =  __super::Create(pParent, pLayout, visibility);
 
@@ -96,7 +92,7 @@ BOOL CXScrollFrame::Create( CXFrame *pParent, LayoutParam * pLayout,  VISIBILITY
 	}
 
 	if ((m_nScrollBar & SCROLL_BAR_V) && !m_pScrollV)
-	{
+	{	
 		m_pScrollV = new CXScrollBar();
 		m_pScrollV->Create(this, CXScrollBar::SCROLL_V, GenerateLayoutParam(), 
 			VISIBILITY_SHOW, pScrollVImageBG, pScrollVImageFG);
@@ -105,29 +101,9 @@ BOOL CXScrollFrame::Create( CXFrame *pParent, LayoutParam * pLayout,  VISIBILITY
 
 	if (!m_pFrameView)
 	{
-		m_pFrameView = new CXFrame();
+		m_pFrameView = new CXScrollView();
 		m_pFrameView->Create(this, GenerateLayoutParam(), VISIBILITY_SHOW);
 		m_pFrameView->AddEventListener(this);
-	}
-
-	if (!m_pFrameView->GetFrameCount())
-	{
-		LayoutParam * pLayout = GenerateLayoutParam();
-		if (pLayout)
-		{
-			pLayout->m_mWidth = pLayout->m_mHeight 
-				= LayoutParam::METRIC_WRAP_CONTENT;
-
-			CXScrollContentContainer *pContentContainer = new CXScrollContentContainer();
-			pContentContainer->Create(m_pFrameView, pLayout, VISIBILITY_SHOW);
-			m_pFrameContent = pContentContainer;
-			m_pFrameContent->AddEventListener(this);
-		}
-		else
-		{
-			ATLASSERT(NULL);
-			return FALSE;
-		}
 	}
 
 	return bRtn;
@@ -135,45 +111,27 @@ BOOL CXScrollFrame::Create( CXFrame *pParent, LayoutParam * pLayout,  VISIBILITY
 
 VOID CXScrollFrame::OnHScroll(CXFrame *pSrcFrame, UINT uEvent, WPARAM wParam, LPARAM lParam, BOOL& bHandled )
 {
-	ATLASSERT(m_pFrameContent);
+	ATLASSERT(m_pFrameView);
 
 	INT nPos = (INT)wParam;
 
-	if (m_pFrameContent)
-	{
-		LayoutParam *pLayoutParma = 
-			m_pFrameContent->BeginUpdateLayoutParam();
-		ATLASSERT(pLayoutParma);
-		if (pLayoutParma)
-		{
-			pLayoutParma->m_nX = -nPos;
-			m_pFrameContent->EndUpdateLayoutParam();
-		}
-	}
+	if (m_pFrameView)
+		m_pFrameView->SetScrollX(nPos);
 }
 
 VOID CXScrollFrame::OnVScroll(CXFrame *pSrcFrame, UINT uEvent, WPARAM wParam, LPARAM lParam, BOOL& bHandled )
 {
-	ATLASSERT(m_pFrameContent);
+	ATLASSERT(m_pFrameView);
 
 	INT nPos = (INT)wParam;
 
-	if (m_pFrameContent)
-	{
-		LayoutParam *pLayoutParma = 
-			m_pFrameContent->BeginUpdateLayoutParam();
-		if (pLayoutParma)
-		{
-			pLayoutParma->m_nY = -nPos;
-			m_pFrameContent->EndUpdateLayoutParam();
-		}
-	}
+	if (m_pFrameView)
+		m_pFrameView->SetScrollY(nPos);
 }
 
 VOID CXScrollFrame::Destroy()
 {
-	m_pFrameView = m_pFrameContent = m_pScrollH = m_pScrollV = NULL;
-
+	m_pFrameView = m_pScrollH = m_pScrollV = NULL;
 	return __super::Destroy();
 }
 
@@ -188,14 +146,7 @@ BOOL CXScrollFrame::AddContentFrame( CXFrame *pFrame )
 		return FALSE;
 	}
 
-	CXFrame * pContentContainer = m_pFrameView->GetFrameByIndex(0);
-	if (!pContentContainer)
-	{
-		ATLASSERT(NULL);
-		return FALSE;
-	}
-
-	return pContentContainer->AddFrame(pFrame);
+	return m_pFrameView->AddFrame(pFrame);
 }
 
 UINT CXScrollFrame::GetContentFrameCount()
@@ -203,41 +154,23 @@ UINT CXScrollFrame::GetContentFrameCount()
 	if (!m_pFrameView)
 		return 0;
 
-	CXFrame *pContentContainer = 
-		m_pFrameView->GetFrameByIndex(0);
-
-	if (!pContentContainer)
-		return 0;
-
-	return pContentContainer->GetFrameCount();
+	return m_pFrameView->GetFrameCount();
 }
 
 CXFrame * CXScrollFrame::RemoveContentFrame( UINT nIndex )
 {
-	if (!m_pFrameView)
-		return NULL;
-
 	if (nIndex >= GetContentFrameCount())
 		return NULL;
 
-	CXFrame *pContentContainer = 
-		m_pFrameView->GetFrameByIndex(0);
-
-	if (!pContentContainer)
+	if (!m_pFrameView)
 		return NULL;
 
-	return pContentContainer->RemoveFrame(nIndex);
+	return m_pFrameView->RemoveFrame(nIndex);
 }
 
 BOOL CXScrollFrame::HandleXMLChildNodes( X_XML_NODE_TYPE xml )
 {
 	if (!m_pFrameView)
-	{
-		ATLASSERT(NULL);
-		return FALSE;
-	}
-	CXFrame * pContentContainer = m_pFrameView->GetFrameByIndex(0);
-	if (!pContentContainer)
 	{
 		ATLASSERT(NULL);
 		return FALSE;
@@ -249,7 +182,7 @@ BOOL CXScrollFrame::HandleXMLChildNodes( X_XML_NODE_TYPE xml )
 		if (child->type() != X_XML_NODE_CATEGORY_TYPE::node_element)
 			continue;
 		CXFrame *pFrame = 
-			CXFrameXMLFactory::Instance().BuildFrame(child, pContentContainer);
+			CXFrameXMLFactory::Instance().BuildFrame(child, m_pFrameView);
 	}
 
 	return TRUE;
@@ -378,59 +311,33 @@ VOID CXScrollFrame::OnViewRectChanged( CXFrame *pSrcFrame,
 	const CRect &rcOld = *(CRect *)wParam;
 	const CRect &rcNew = *(CRect *)lParam;
 
-	OnViewOrContentChanged(&CXScrollBar::SetViewLen, rcOld, rcNew);
+	OnViewOrContentChanged(&CXScrollBar::SetViewLen, 
+		rcOld.Width(), rcOld.Height(), 
+		rcNew.Width(), rcNew.Height());
 }
 
 VOID CXScrollFrame::OnContentRectChanged( CXFrame *pSrcFrame, 
 										 UINT uEvent, WPARAM wParam, LPARAM lParam, BOOL& bHandled )
 {
-	const CRect &rcOld = *(CRect *)wParam;
-	const CRect &rcNew = *(CRect *)lParam;
+	const CSize &rcOld = *(CSize *)wParam;
+	const CSize &rcNew = *(CSize *)lParam;
 
-	OnViewOrContentChanged(&CXScrollBar::SetContentLen, rcOld, rcNew);
+	OnViewOrContentChanged(&CXScrollBar::SetContentLen, 
+		rcOld.cx, rcOld.cy,
+		rcNew.cx, rcNew.cy);
 }
 
-VOID CXScrollFrame::OnViewOrContentChanged( BOOL (CXScrollBar::*pfnSetLen)(INT),
-										   const CRect &rcOld, const CRect &rcNew)
+VOID CXScrollFrame::OnViewOrContentChanged( BOOL (CXScrollBar::*pfnSetLen)(INT), 
+										   INT nOldWidth, INT nOldHeight, INT nNewWidth, INT nNewHeight )
 {
-	ATLASSERT(m_pFrameView && m_pFrameContent);
+	ATLASSERT(m_pFrameView);
 	ATLASSERT(!(m_nScrollBar & SCROLL_BAR_H) || m_pScrollH);
 	ATLASSERT(!(m_nScrollBar & SCROLL_BAR_V) || m_pScrollV);
 
-	if (m_pScrollV && rcOld.Height() != rcNew.Height())
-	{
-		int nOldPos = m_pScrollV->GetScrollPos();
-		(m_pScrollV->*pfnSetLen)(rcNew.Height());
-		int nNewPos = m_pScrollV->GetScrollPos();
-		if (nOldPos != nNewPos && m_pFrameContent)
-		{
-			LayoutParam *pLayoutParam = 
-				m_pFrameContent->BeginUpdateLayoutParam();
-			ATLASSERT(pLayoutParam);
-			if (pLayoutParam)
-			{
-				pLayoutParam->m_nY = -nNewPos;
-				m_pFrameContent->EndUpdateLayoutParam();
-			}
-		}
-	}
+	if (m_pScrollV && nOldHeight != nNewHeight)
+		(m_pScrollV->*pfnSetLen)(nNewHeight);
 
-	if (m_pScrollH && rcOld.Width() != rcNew.Width())
-	{
-		int nOldPos = m_pScrollH->GetScrollPos();
-		(m_pScrollH->*pfnSetLen)(rcNew.Width());
-		int nNewPos = m_pScrollH->GetScrollPos();
-		if (nOldPos != nNewPos && m_pFrameContent)
-		{
-			LayoutParam *pLayoutParam = 
-				m_pFrameContent->BeginUpdateLayoutParam();
-			ATLASSERT(pLayoutParam);
-			if (pLayoutParam)
-			{
-				pLayoutParam->m_nX = -nNewPos;
-				m_pFrameContent->EndUpdateLayoutParam();
-			}
-		}
-	}
+	if (m_pScrollH && nOldWidth != nNewWidth)
+		(m_pScrollH->*pfnSetLen)(nNewWidth);
 }
 

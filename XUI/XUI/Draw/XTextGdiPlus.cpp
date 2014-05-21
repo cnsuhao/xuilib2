@@ -54,7 +54,9 @@ BOOL CXTextGdiPlus::SetDstRect(const CRect &rcDst)
 	if (rcDst == m_rcDst)
 		return TRUE;
 
-	ReleaseBufferDC();
+	if (rcDst.Width() != m_rcDst.Width() || rcDst.Height() != m_rcDst.Height())
+		ReleaseBufferDC();
+
 	m_rcDst = rcDst;
 
 	return TRUE;
@@ -172,7 +174,7 @@ BOOL CXTextGdiPlus::RefreashBufferDC(HDC hDCSrc)
 	Gdiplus::RectF rfTargetRect(0, 0, m_rcDst.Width(), m_rcDst.Height());
 	CStringW strTextToDraw(XLibST2W(m_strText));
 
-	// When centering texts vertically, gdi+ will put the texts a litter higher, 
+	// When centering texts vertically, gdi+ will put the texts a little higher, 
 	// so we'll handle vertically centering ourselves. 
 	if (m_AlignmentV == Gdiplus::StringAlignmentCenter)
 	{

@@ -1,0 +1,11 @@
+/Debug/*.exe
+/Debug/*.ilk
+/Debug/*.pdb
+/Debug/*.lib
+/Release/*.exe
+/Release/*.pdb
+/Release/*.lib
+/XUI/Debug/
+/XUI/Release/
+/TestUI/Debug/
+/TestUI/Release/

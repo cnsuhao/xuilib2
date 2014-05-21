@@ -222,14 +222,11 @@ BOOL CXEdit::TxSetCaretPos( INT x, INT y )
 	{
 		CPoint ptPos = RootFrameToThisFrame(CPoint(x, y));
 
-		LayoutParam *pLayoutParam = m_pCaret->BeginUpdateLayoutParam();
-		ATLASSERT(pLayoutParam);
-		if (pLayoutParam)
-		{
-			pLayoutParam->m_nX = ptPos.x;
-			pLayoutParam->m_nY = ptPos.y;
-			return m_pCaret->EndUpdateLayoutParam();
-		}
+		CRect rc (m_pCaret->GetRect());
+		rc.MoveToXY(ptPos.x, ptPos.y);
+		m_pCaret->SetRect(rc);
+
+		return TRUE;
 	}
 
 	return FALSE;
@@ -616,12 +613,6 @@ BOOL CXEdit::Create( CXFrame * pFrameParent, LayoutParam * pLayout,  VISIBILITY 
 {
 	ATLASSERT(m_pTextService == NULL);
 
-	if (!pLayout) 
-	{
-		ATLASSERT(!_T("No layout parameter. "));
-		return NULL;
-	}
-
 	ResetCharFormat();
 	ResetParaFormat();
 
@@ -644,7 +635,7 @@ BOOL CXEdit::Create( CXFrame * pFrameParent, LayoutParam * pLayout,  VISIBILITY 
 		if (bRtn)
 		{
 			m_pCaret = new CXCaret();
-			m_pCaret->Create(this, GenerateLayoutParam());
+			m_pCaret->Create(this, NULL);
 		}
 	}
 

@@ -32,5 +32,5 @@ public:
 
 private:
 	IXText *m_pText;
-	BOOL m_nMeasredHeight;
+	INT m_nMeasredHeight;
 };

@@ -30,12 +30,18 @@ CXFrame::CXFrame(void)
 	m_bMouseDown(FALSE),
 	m_Visibility(VISIBILITY_NONE),
 	m_rcFrame(0, 0, 0, 0),
+	m_nOffsetX(0),
+	m_nOffsetY(0),
+	m_nScrollX(0),
+	m_nScrollY(0),
+	m_bManualLayoutMode(FALSE),
 	m_pLayoutParam(NULL),
 	m_pDelayLayoutParam(NULL),
 	m_bDelayUpdateLayoutParamScheduled(FALSE),
 	m_nMeasuredWidth(0),
 	m_nMeasuredHeight(0),
 	m_bLayoutInvaild(TRUE),
+	m_bNeedInvalidateAfterLayout(FALSE),
 	m_dwInstanceID(RegisterInstanceID()),
 	m_bIsFrameAlive(FALSE)
 {
@@ -52,17 +58,16 @@ CXFrame:: ~CXFrame(void)
 
 BOOL CXFrame::Create( CXFrame * pFrameParent, LayoutParam * pLayout, VISIBILITY visibility /*= VISIBILITY_NONE*/)
 {
-	if (!pLayout) 
-	{
-		ATLASSERT(!_T("No layout parameter. "));
-		return FALSE;
-	}
-
 	ATLASSERT(!m_bIsFrameAlive || !_T("Already created. "));
 	m_bIsFrameAlive = TRUE;
 
-	BeginUpdateLayoutParam(pLayout);
-	EndUpdateLayoutParam();
+ 	if (!pLayout) 
+ 		OpenManualLayoutMode();
+ 	else
+ 	{
+		BeginUpdateLayoutParam(pLayout);
+		EndUpdateLayoutParam();
+	}	
 
 	SetParent(pFrameParent);
 
@@ -94,6 +99,8 @@ VOID CXFrame::Destroy()
 	m_LastMeasureHeightParam.Reset();
 
 	SetRect(CRect(0, 0, 0, 0));
+	m_nOffsetX = m_nOffsetY = 0;
+	m_nScrollX = m_nScrollY = 0;
 
 	delete SetBackground(NULL);
 
@@ -107,6 +114,7 @@ VOID CXFrame::Destroy()
 	SetSelectedState(FALSE);
 	delete SetSelectedLayer(NULL);
 
+	m_bManualLayoutMode = FALSE;
 
 	delete m_pLayoutParam;
 	m_pLayoutParam = NULL;
@@ -117,6 +125,7 @@ VOID CXFrame::Destroy()
 	m_nMeasuredWidth = m_nMeasuredHeight = 0;
 
 	m_bLayoutInvaild = TRUE;
+	m_bNeedInvalidateAfterLayout = FALSE;
 
 	m_bMouseOver = FALSE;
 	m_bMouseDown = FALSE;
@@ -492,6 +501,7 @@ CXFrameMsgMgr *CXFrame::GetFrameMsgMgr()
 
 CXFrame * CXFrame::GetTopFrameFromPoint(const CPoint &pt)
 {
+	if (m_Visibility != VISIBILITY_SHOW) return NULL;
 	if (!::PtInRect(&CRect(0, 0, m_rcFrame.Width(), m_rcFrame.Height()), pt))
 		return NULL;
 
@@ -499,7 +509,7 @@ CXFrame * CXFrame::GetTopFrameFromPoint(const CPoint &pt)
 
 	std::vector<CXFrame *>::const_reverse_iterator iter = m_vecFrameChild.rbegin();
 	for (; iter != m_vecFrameChild.rend(); ++iter)
-		if(*iter && (*iter)->GetVisibility() == VISIBILITY_SHOW && ::PtInRect(&(*iter)->GetRect(), pt))
+		if(*iter)
 		{
 			CXFrame *pFrameChild = (*iter)->GetTopFrameFromPoint((*iter)->ParentToChild(pt));
 			if (pFrameChild)
@@ -885,7 +895,13 @@ BOOL CXFrame::ConfigFrameByXML( X_XML_NODE_TYPE xml )
 	HandleXMLChildNodes(xml);
 
 	attr = xml->first_attribute("visible", 0, false);
-	if (!attr || StrCmpIA(attr->value(), "false"))
+	if (!attr || !StrCmpIA(attr->value(), "show"))
+		SetVisibility(VISIBILITY_SHOW);
+	else if (!StrCmpIA(attr->value(), "hide"))
+		SetVisibility(VISIBILITY_HIDE);
+	else if (!StrCmpIA(attr->value(), "none"))
+		SetVisibility(VISIBILITY_NONE);
+	else
 		SetVisibility(VISIBILITY_SHOW);
 
 	return TRUE;
@@ -1276,7 +1292,7 @@ CXFrame::LayoutParam * CXFrame::GenerateLayoutParam( LayoutParam *pCopyFrom /*=N
 }
 
 CXFrame::LayoutParam * CXFrame::GenerateLayoutParam( X_XML_NODE_TYPE xml )
-{
+{	
 	LayoutParam *p = GenerateLayoutParam();
 	if (p) p->FillByXML(xml);
 	return p;
@@ -1284,22 +1300,45 @@ CXFrame::LayoutParam * CXFrame::GenerateLayoutParam( X_XML_NODE_TYPE xml )
 
 BOOL CXFrame::InvalidateAfterLayout()
 {
+	m_bNeedInvalidateAfterLayout = TRUE;
 	return TRUE;
 }
 
 CXFrame::LayoutParam * CXFrame::BeginUpdateLayoutParam()
 {
+	if (!m_pLayoutParam) {
+		ATLASSERT(NULL);
+		return NULL;
+	}
+
 	if (IsLayouting())
 	{
-		if (!m_pDelayLayoutParam)
-			m_pDelayLayoutParam = GenerateLayoutParam(m_pLayoutParam);
+		if (m_pDelayLayoutParam)
+			return m_pDelayLayoutParam;
+
+		if (m_pFrameParent)
+			m_pDelayLayoutParam = 
+				m_pFrameParent->GenerateLayoutParam(m_pLayoutParam);
+		else
+			m_pDelayLayoutParam =
+				new CXFrame::LayoutParam(*m_pLayoutParam);
 
 		return m_pDelayLayoutParam;
 	}
 	else
 	{
-		if (!m_pLayoutParam)
-			m_pLayoutParam = GenerateLayoutParam();
+		if (m_pDelayLayoutParam)
+		{
+			if (m_pDelayLayoutParam != m_pLayoutParam)
+			{
+				delete m_pLayoutParam;
+				m_pLayoutParam = NULL;
+
+				m_pLayoutParam = m_pDelayLayoutParam;
+			}
+			
+			m_pDelayLayoutParam = NULL;
+		}
 
 		return m_pLayoutParam;
 	}
@@ -1315,25 +1354,29 @@ BOOL CXFrame::BeginUpdateLayoutParam( LayoutParam *pLayoutParam )
 
 	if (IsLayouting())
 	{
-		if (pLayoutParam == m_pDelayLayoutParam)
-			return TRUE;
+		if (m_pDelayLayoutParam != pLayoutParam)
+		{
+			delete m_pDelayLayoutParam;
+			m_pDelayLayoutParam = NULL;
 
-		delete m_pDelayLayoutParam;
-
-		m_pDelayLayoutParam = pLayoutParam;
+			m_pDelayLayoutParam = pLayoutParam;
+		}
 	}
 	else
 	{
+		if (m_pDelayLayoutParam == m_pLayoutParam)
+			m_pDelayLayoutParam = NULL;
 
 		delete m_pDelayLayoutParam;
 		m_pDelayLayoutParam = NULL;
 
-		if (pLayoutParam == m_pLayoutParam)
-			return TRUE;
+		if (m_pLayoutParam != pLayoutParam)
+		{
+			delete m_pLayoutParam;
+			m_pLayoutParam = NULL;
 
-		delete m_pLayoutParam;
-
-		m_pLayoutParam = pLayoutParam;
+			m_pLayoutParam = pLayoutParam;
+		}
 	}
 
 	return TRUE;
@@ -1341,6 +1384,9 @@ BOOL CXFrame::BeginUpdateLayoutParam( LayoutParam *pLayoutParam )
 
 BOOL CXFrame::EndUpdateLayoutParam()
 {
+	if (m_bManualLayoutMode)
+		return FALSE;
+
 	if (m_pDelayLayoutParam)
 	{
 		if (m_bDelayUpdateLayoutParamScheduled)
@@ -1438,6 +1484,9 @@ BOOL CXFrame::OnMeasureLayoutDirection( const MeasureParam & param, INT *pMeasur
 		}
 
 		CXFrame *pCur = *it;
+		if (!pCur->NeedLayout())
+			continue;
+
 		LayoutParam *pLayoutParam = pCur->GetLayoutParam();
 
 		if (!pLayoutParam)
@@ -1445,9 +1494,6 @@ BOOL CXFrame::OnMeasureLayoutDirection( const MeasureParam & param, INT *pMeasur
 			ATLASSERT(NULL);
 			continue;
 		}
-
-		if (pCur->m_Visibility == VISIBILITY_NONE)
-			continue;
 
 		if (pLayoutParam->*pmLayoutParamSize 
 			== LayoutParam::METRIC_REACH_PARENT)
@@ -1504,6 +1550,9 @@ BOOL CXFrame::OnMeasureLayoutDirection( const MeasureParam & param, INT *pMeasur
 		}
 
 		CXFrame *pCur = *it;
+		if (!pCur->NeedLayout())
+			continue;
+
 		LayoutParam *pLayoutParam = pCur->GetLayoutParam();
 
 		if (!pLayoutParam)
@@ -1511,9 +1560,6 @@ BOOL CXFrame::OnMeasureLayoutDirection( const MeasureParam & param, INT *pMeasur
 			ATLASSERT(NULL);
 			continue;
 		}
-
-		if (pCur->m_Visibility == VISIBILITY_NONE)
-			continue;
 
 		if (pLayoutParam->*pmLayoutParamSize 
 			!= LayoutParam::METRIC_REACH_PARENT)
@@ -1530,16 +1576,30 @@ BOOL CXFrame::OnMeasureLayoutDirection( const MeasureParam & param, INT *pMeasur
 	return TRUE;
 }
 
-BOOL CXFrame::Layout( const CRect & rcRect )
+BOOL CXFrame::Layout( const CRect & rc )
 {
-	if (rcRect == m_rcFrame && !m_bLayoutInvaild)
-		return TRUE;
+	CRect rcRect(rc);
 
-	m_bLayoutInvaild = FALSE;
+	if (m_pFrameParent)
+		rcRect.OffsetRect(-m_pFrameParent->GetScrollX(), -m_pFrameParent->GetScrollY());
+	rcRect.OffsetRect(m_nOffsetX, m_nOffsetY);
 
-	OnLayout(rcRect);
+	if (rcRect != m_rcFrame || m_bLayoutInvaild) 
+	{
+		m_bLayoutInvaild = FALSE;
 
-	SetRect(rcRect);
+		OnLayout(rcRect);
+
+		SetRect(rcRect);
+		
+	}
+
+	if (m_bNeedInvalidateAfterLayout) 
+	{
+		m_bNeedInvalidateAfterLayout = FALSE;
+		InvalidateRect();
+	}
+		
 
 	return TRUE;
 }
@@ -1556,16 +1616,15 @@ BOOL CXFrame::OnLayout( const CRect & rcRect )
 		}
 
 		CXFrame *pCur = *it;
-		LayoutParam *pLayoutParam = pCur->GetLayoutParam();
+		if (!pCur->NeedLayout())
+			continue;
 
+		LayoutParam *pLayoutParam = pCur->GetLayoutParam();
 		if (!pLayoutParam)
 		{
 			ATLASSERT(NULL);
 			continue;
 		}
-
-		if (pCur->m_Visibility == VISIBILITY_NONE)
-			continue;
 
 		CRect rc(pLayoutParam->m_nX, pLayoutParam->m_nY,
 			pLayoutParam->m_nX + pCur->GetMeasuredWidth(),
@@ -1600,19 +1659,135 @@ BOOL CXFrame::IsLayouting()
 LRESULT CXFrame::OnDelayUpdateLayoutParam( UINT uMsg, WPARAM wParam, LPARAM lParam, 
 									  BOOL& bHandled, BOOL& bCancelBabble )
 {
-	if (!m_bDelayUpdateLayoutParamScheduled || !m_pDelayLayoutParam)
+	if (!m_bDelayUpdateLayoutParamScheduled)
 		return -1;
 
 	m_bDelayUpdateLayoutParamScheduled = FALSE;
 
-	delete m_pLayoutParam;
-	m_pLayoutParam = m_pDelayLayoutParam;
+	if (!m_pDelayLayoutParam) return 0;
 
+	if (m_pLayoutParam != m_pDelayLayoutParam)
+	{
+		delete m_pLayoutParam;
+		m_pLayoutParam = NULL;
+
+		m_pLayoutParam = m_pDelayLayoutParam;
+	}
+	
 	m_pDelayLayoutParam = NULL;
 
 	EndUpdateLayoutParam();
 
 	return 0;
+}
+
+INT CXFrame::GetOffsetX()
+{
+	return m_nOffsetX;
+}
+
+INT CXFrame::GetOffsetY()
+{
+	return m_nOffsetY;
+}
+
+INT CXFrame::GetScrollX()
+{
+	return m_nScrollX;
+}
+
+INT CXFrame::GetScrollY()
+{
+	return m_nScrollY;
+}
+
+BOOL CXFrame::UpdateScroll(INT nDeltaX,INT nDeltaY )
+{
+	for (std::vector<CXFrame *>::const_iterator it = m_vecFrameChild.begin();
+		it != m_vecFrameChild.end(); it++)
+	{
+		ATLASSERT(*it);
+		if (*it) {
+			CRect rcNew((*it)->GetRect());
+			rcNew.OffsetRect(-nDeltaX, -nDeltaY);
+			(*it)->SetRect(rcNew);
+		}
+	}
+
+	return TRUE;
+}
+
+BOOL CXFrame::UpdateOffset( INT nDeltaX, INT nDeltaY )
+{
+	CRect rcNew(m_rcFrame);
+	rcNew.OffsetRect(nDeltaX, nDeltaY);
+	return SetRect(rcNew);
+}
+
+BOOL CXFrame::SetScrollX( INT x )
+{
+	if (m_nScrollX == x) return TRUE;
+	UpdateScroll(x - m_nScrollX, 0);
+	m_nScrollX = x;
+	return TRUE;
+}
+
+BOOL CXFrame::SetScrollY( INT y )
+{
+	if (m_nScrollY == y) return TRUE;
+	UpdateScroll(0, y - m_nScrollY);
+	m_nScrollY = y;
+	return TRUE;
+}
+
+BOOL CXFrame::SetOffsetX( INT x )
+{
+	if (m_nOffsetX == x) return TRUE;
+	UpdateOffset(x - m_nOffsetX, 0);
+	m_nOffsetX = x;
+	return TRUE;
+}
+
+BOOL CXFrame::SetOffsetY( INT y )
+{
+	if (m_nOffsetY == y) return TRUE;
+	UpdateOffset(0, y - m_nOffsetY);
+	m_nOffsetY = y;
+	return TRUE;
+}
+
+BOOL CXFrame::NeedLayout()
+{
+	return m_Visibility != VISIBILITY_NONE && !m_bManualLayoutMode;
+}
+
+BOOL CXFrame::OpenManualLayoutMode()
+{
+	delete m_pDelayLayoutParam;
+	delete m_pLayoutParam;
+	m_pDelayLayoutParam = m_pLayoutParam = NULL;
+
+	m_bManualLayoutMode = TRUE;
+
+	return TRUE;
+}
+
+BOOL CXFrame::CloseManualLayoutMode( LayoutParam *pLayoutParam )
+{
+	if (!pLayoutParam) {
+		ATLASSERT(NULL);
+		return FALSE;
+	}
+
+	m_bManualLayoutMode = FALSE;
+
+	BeginUpdateLayoutParam(pLayoutParam);
+	EndUpdateLayoutParam();
+}
+
+BOOL CXFrame::GetManualLayoutMode()
+{
+	return m_bManualLayoutMode;
 }
 
 CXFrame::LayoutParam::LayoutParam( X_XML_NODE_TYPE xml)

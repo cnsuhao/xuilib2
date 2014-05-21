@@ -32,7 +32,7 @@ CXFrame * CXStatic::CreateFrameFromXML(X_XML_NODE_TYPE xml, CXFrame *pParent)
 
 CXStatic::CXStatic(void)
 	: m_pText(NULL),
-	m_nMeasredHeight(0)
+	m_nMeasredHeight(-1)
 {
 }
 
@@ -60,7 +60,8 @@ IXText * CXStatic::SetText( IXText *pText )
 		m_pText->SetDstRect(CRect(0, 0, rcFrame.Width(), rcFrame.Height()));
 	}
 
-	InvalidateRect();
+	InvalidateLayout();
+	InvalidateAfterLayout();
 
 	return pOldText;
 }
@@ -87,12 +88,6 @@ BOOL CXStatic::SetRect( const CRect & rcNewFrameRect )
 BOOL CXStatic::Create( CXFrame * pFrameParent, LayoutParam * pLayout,  VISIBILITY visibility /*= VISIBILITY_NONE*/, 
 					  IXText *pText /*= NULL*/)
 {
-	if (!pLayout) 
-	{
-		ATLASSERT(!_T("No layout parameter. "));
-		return FALSE;
-	}
-
 	BOOL bRtn =  __super::Create(pFrameParent, pLayout, visibility);
 
 	delete SetText(pText);
@@ -120,7 +115,7 @@ BOOL CXStatic::OnMeasureWidth( const MeasureParam & param )
 
 	CSize szText(0, 0);
 
-	int nMeasured = GetMeasuredWidth();
+	INT nMeasured = GetMeasuredWidth();
 
 	if (param.m_Spec != MeasureParam::MEASURE_EXACT)
 	{
@@ -129,7 +124,11 @@ BOOL CXStatic::OnMeasureWidth( const MeasureParam & param )
 		else
 			szText = m_pText->Measure(dc);
 
-		SetMeasuredWidth(max(nMeasured, szText.cx));
+		INT nNewMeasured = max(nMeasured, szText.cx);
+		if (param.m_Spec == MeasureParam::MEASURE_ATMOST)
+			nNewMeasured = min(nNewMeasured, param.m_nNum);
+
+		SetMeasuredWidth(nNewMeasured);
 	}
 	else
 		szText = m_pText->Measure(dc, nMeasured);

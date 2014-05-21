@@ -26,7 +26,7 @@ public:
 	BOOL IsFormattedImage();
 
 private:
-	BOOL RefreashBufferDC(HDC hDCSrc);
+	BOOL RefreshBufferDC(HDC hDCSrc);
 	VOID ReleaseBufferDC();
 	VOID InitSrcRect();
 

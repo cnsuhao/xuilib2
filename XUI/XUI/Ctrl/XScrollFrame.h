@@ -1,7 +1,6 @@
 #pragma once
 
 #include "XScrollBar.h"
-#include "XScrollContentContainer.h"
 
 class CXScrollFrame :
 	public CXFrame
@@ -22,7 +21,7 @@ public:
 		FRAME_EVENT_FRAME_HANDLER(EVENT_SCROLLBAR_SCROLLCHANGED, m_pScrollH, OnHScroll)
 		FRAME_EVENT_FRAME_HANDLER(EVENT_SCROLLBAR_SCROLLCHANGED, m_pScrollV, OnVScroll)
 		FRAME_EVENT_FRAME_HANDLER(EVENT_FRAME_RECT_CHANGED, m_pFrameView, OnViewRectChanged)
-		FRAME_EVENT_FRAME_HANDLER(EVENT_FRAME_RECT_CHANGED, m_pFrameContent, OnContentRectChanged)
+		FRAME_EVENT_FRAME_HANDLER(EVENT_SCROLLVIEW_BOUND_CHANGED, m_pFrameView, OnContentRectChanged)
 	END_FRAME_EVENT_MAP()
 
 public:
@@ -58,14 +57,13 @@ public:
 
 private:
 	VOID OnViewOrContentChanged(BOOL (CXScrollBar::*pfnSetLen)(INT), 
-		const CRect &rcOld, const CRect &rcNew);
+		INT nOldWidth, INT nOldHeight, INT nNewWidth, INT nNewHeight);
 
 private:
 	UINT m_nScrollBar;
 
 private:
 	CXFrame *m_pFrameView;
-	CXFrame *m_pFrameContent;
 	CXScrollBar *m_pScrollH;
 	CXScrollBar *m_pScrollV;
 };

@@ -81,14 +81,15 @@ BOOL CXTree::Create( CXFrame * pFrameParent, LayoutParam * pLayout, VISIBILITY v
 	m_pRootItemFrameContainer = new CXDock();
 	m_pRootItemFrameContainer->Create(this, CXDock::DOCK_LEFT2RIGHT, CXDock::ALIGN_MIDDLE, 
 		pRootItemFrameContainerLayout, VISIBILITY_SHOW);
+	m_pRootItemFrameContainer->AddEventListener(this);
 	m_pChildItemFrameContainer = new CXDock();
 	m_pChildItemFrameContainer->Create(this, CXDock::DOCK_TOP2BOTTOM, CXDock::ALIGN_LOW,
 		pChildItemFrameContainerLayout, VISIBILITY_SHOW);
 
 	if (pFoldedButtonFace == NULL)
-		pFoldedButtonFace = CXResourceMgr::Instance().GetImage(_T("img/ctrl/folded_button.png"));
+		pFoldedButtonFace = CXResourceMgr::GetImage(_T("img/ctrl/folded_button.png"));
 	if (pUnfoldedButtonFace == NULL)
-		pUnfoldedButtonFace = CXResourceMgr::Instance().GetImage(_T("img/ctrl/unfolded_button.png"));
+		pUnfoldedButtonFace = CXResourceMgr::GetImage(_T("img/ctrl/unfolded_button.png"));
 
 	IXImage *pButtonFaces[] = {pFoldedButtonFace, pUnfoldedButtonFace};
 
@@ -125,7 +126,7 @@ BOOL CXTree::SetUnfold( BOOL bUnfold )
 	return TRUE;
 }
 
-BOOL CXTree::IsUnfold()
+BOOL CXTree::IsUnfolded()
 {
 	if (!m_pChildItemFrameContainer)
 		return FALSE;
@@ -248,7 +249,7 @@ VOID CXTree::OnFoldUnfoldButtonClicked( CXFrame *pSrcFrame, UINT uEvent, WPARAM 
  	if (pSrcFrame != pFoldUnfoldButton)
  		return;
  
- 	if (IsUnfold())
+ 	if (IsUnfolded())
  		SetUnfold(FALSE);
  	else
  		SetUnfold(TRUE);
@@ -256,7 +257,7 @@ VOID CXTree::OnFoldUnfoldButtonClicked( CXFrame *pSrcFrame, UINT uEvent, WPARAM 
 
 BOOL CXTree::PaintForeground( HDC hDC, const CRect &rcUpdate )
 {
-	if (IsUnfold())
+	if (IsUnfolded())
 	{
 		CXFrame *pFoldUnFoldButton = NULL;
 		if (m_pRootItemFrameContainer && (pFoldUnFoldButton = m_pRootItemFrameContainer->GetFrameByIndex(0))
@@ -273,12 +274,15 @@ BOOL CXTree::PaintForeground( HDC hDC, const CRect &rcUpdate )
 				m_pChildItemFrameContainer->GetRect().left;
 			INT nVLineYStart = m_pRootItemFrameContainer->GetRect().bottom;
 
-			if (!(nLinesXEnd - nLinesXStart < 0 || 
+			if (!(nLinesXEnd - nLinesXStart <= 0 || 
 				nLinesXStart >= rcUpdate.right || nLinesXEnd <= rcUpdate.left))
 				for (UINT i = 0; i < m_pChildItemFrameContainer->GetFrameCount(); i++)
 				{
 					CXFrame *pCurrentFrame = m_pChildItemFrameContainer->GetFrameByIndex(i);
 					if (!pCurrentFrame)
+						continue;
+
+					if (pCurrentFrame->GetVisibility() != VISIBILITY_SHOW)
 						continue;
 
 					INT nHLineY = pCurrentFrame->GetRect().top + max(0, pCurrentFrame->GetVCenter()) 
@@ -400,14 +404,7 @@ VOID CXTree::UpdateLeftMarginOfChildItemContainer()
 		nChildMarginLeft += m_pRootItemFrameContainer->GetRect().left;
 		CXFrame * pFoldUnfoldButton = NULL;
 		if (pFoldUnfoldButton = m_pRootItemFrameContainer->GetFrameByIndex(0))
-		{
-			nChildMarginLeft += pFoldUnfoldButton->GetRect().right;
-
-			LayoutParam *pLayoutParamOfButton = pFoldUnfoldButton->GetLayoutParam();
-			ATLASSERT(pLayoutParamOfButton);
-			if (pLayoutParamOfButton)
-				nChildMarginLeft += pLayoutParamOfButton->m_nMarginRight;
-		}
+			nChildMarginLeft += pFoldUnfoldButton->GetRect().right + FOLD_UNFOLD_BUTTON_MARGIN_RIGHT;
 	}
 
 	if (m_pChildItemFrameContainer)

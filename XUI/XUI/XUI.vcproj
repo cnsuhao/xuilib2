@@ -375,19 +375,19 @@
 				>
 			</File>
 			<File
-				RelativePath=".\Ctrl\XScrollContentContainer.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\Ctrl\XScrollContentContainer.h"
-				>
-			</File>
-			<File
 				RelativePath=".\Ctrl\XScrollFrame.cpp"
 				>
 			</File>
 			<File
 				RelativePath=".\Ctrl\XScrollFrame.h"
+				>
+			</File>
+			<File
+				RelativePath=".\Ctrl\XScrollView.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\Ctrl\XScrollView.h"
 				>
 			</File>
 			<File

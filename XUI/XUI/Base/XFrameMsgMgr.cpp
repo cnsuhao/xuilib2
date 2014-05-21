@@ -82,7 +82,6 @@ LRESULT CXFrameMsgMgr::HandleMessage( UINT uMsg, WPARAM wParam, LPARAM lParam, B
 
 BOOL CXFrameMsgMgr::DispatchFrameMsg( UINT uMsg, WPARAM wParam, LPARAM lParam, CXFrame *pFrame, LRESULT &lResult)
 {
-	BOOL bHandled = FALSE;
 	while (pFrame && pFrame->IsFrameActive())
 	{
 		BOOL bCancleBubble = FALSE;
@@ -95,7 +94,6 @@ BOOL CXFrameMsgMgr::DispatchFrameMsg( UINT uMsg, WPARAM wParam, LPARAM lParam, C
 
 		if (pFrame->ProcessFrameMessage(uMsg, wMsgParam, lMsgParam, lResult, bCancleBubble))
 		{
-			bHandled = TRUE;
 			return TRUE;
 		}
 
@@ -115,8 +113,6 @@ CXFrame* CXFrameMsgMgr::GetMessageTarget( UINT uMsg, WPARAM wParam, LPARAM lPara
 {
 	if (!m_rFrameBase)
 		return NULL;
-
-	CXFrame *pTarget = NULL;
 
 	switch (uMsg)
 	{
@@ -142,15 +138,13 @@ CXFrame* CXFrameMsgMgr::GetMessageTarget( UINT uMsg, WPARAM wParam, LPARAM lPara
 			::ScreenToClient(m_rFrameBase->GetHWND(), &pt);
 			return m_rFrameBase->GetTopFrameFromPoint(pt);
 		}
+		break;
 
 	default:
 		break;
 	}
 
-	if (!pTarget)
-		pTarget = m_rFrameFocus;
-
-	return pTarget;
+	return m_rFrameFocus;
 }
 
 VOID CXFrameMsgMgr::PrepareMessageForFrame( UINT uMsg, WPARAM *pwParam, LPARAM *plParam, CXFrame *pFrame )
@@ -274,10 +268,11 @@ BOOL CXFrameMsgMgr::HandleHoverLeaveMessage( UINT uMsg, WPARAM wParam, LPARAM lP
 		UpdateMouseIn(NULL);
 		bRtn = FALSE;
 		break;
-		
-	case WM_MOUSEMOVE:
+
 	case WM_LBUTTONDOWN:
 		TrackMouseEvent();
+		"nobreak";
+	case WM_MOUSEMOVE:
 		CXFrame *pFrameMouseIn = NULL;
 		if (m_rFrameBase)
 			pFrameMouseIn = m_rFrameCaptureMouse ? 

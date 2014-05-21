@@ -40,13 +40,15 @@ BOOL CXScrollBar::SetViewLen( INT nLen )
 
 BOOL CXScrollBar::SetScrollPos( INT nPos )
 {
+	nPos = AdjustScrollPos(nPos);
+
 	if (m_nPos == nPos)
 		return TRUE;
 
 	m_nPos = nPos;
 	UpdateScrollBar();
 
-	ThrowEvent(EVENT_SCROLLBAR_SCROLLCHANGED, nPos, 0);
+	NotifyScrollChange();
 
 	return TRUE;
 }
@@ -71,11 +73,13 @@ IXImage * CXScrollBar::SetBarImage( IXImage *pImage )
 
 VOID CXScrollBar::UpdateScrollBar()
 {
+	INT nAdjustScrollPos = AdjustScrollPos(m_nPos);
 
-	if (m_nPos > m_nContentLen - m_nViewLen)
-		m_nPos = m_nContentLen - m_nViewLen;
-	if (m_nPos < 0)
-		m_nPos = 0;
+	if (nAdjustScrollPos != m_nPos) {
+		SetScrollPos(nAdjustScrollPos);
+		return;
+	}
+
 
 	if (!m_bVisibleState)
 	{
@@ -158,18 +162,15 @@ LRESULT CXScrollBar::OnLButtonDown( UINT uMsg, WPARAM wParam, LPARAM lParam, BOO
 	bHandled = TRUE;
 
 	CXFrameMsgMgr *pMsgMgr = GetFrameMsgMgr();
+	if (pMsgMgr) pMsgMgr->CaptureMouse(this);
 
 	CPoint pt(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
 
 	if (m_rcBar.PtInRect(pt))
-	{	
-		if (pMsgMgr)
-		{
-			m_ptMouseDownPt = CPoint(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
-			m_nMouseDownScrollPos = GetScrollPos();
-			pMsgMgr->CaptureMouse(this);
-			m_bMouseDown = TRUE;
-		}
+	{
+		m_ptMouseDownPt = CPoint(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+		m_nMouseDownScrollPos = GetScrollPos();
+		m_bMouseDown = TRUE;
 	}
 	else
 	{
@@ -182,7 +183,6 @@ LRESULT CXScrollBar::OnLButtonDown( UINT uMsg, WPARAM wParam, LPARAM lParam, BOO
 
 		SetScrollPos(GetScrollPos() + nDirection * m_nViewLen);
 
-		NotifyScrollChange();
 	}
 
 	return 0;
@@ -213,7 +213,6 @@ LRESULT CXScrollBar::OnMouseMove( UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL&
 		else
 			SetScrollPos(m_nMouseDownScrollPos + nOffset * m_nContentLen / GetRect().Height());
 
-		NotifyScrollChange();
 	}
 
 	return 0;
@@ -246,8 +245,6 @@ LRESULT CXScrollBar::OnMouseWheel( UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL
 	else
 		SetScrollPos(GetScrollPos() - nDis * 10);
 
-	NotifyScrollChange();
-
 	return 0;
 }
 
@@ -270,12 +267,6 @@ VOID CXScrollBar::Destroy()
 BOOL CXScrollBar::Create( CXFrame * pFrameParent,  ScrollType type, LayoutParam * pLayout,  VISIBILITY visibility /*= VISIBILITY_NONE*/, 
 						 IXImage * pBarBackground /*= NULL*/, IXImage * pBarImage /*= NULL*/)
 {
-	if (!pLayout) 
-	{
-		ATLASSERT(!_T("No layout parameter. "));
-		return NULL;
-	}
-
 	BOOL bRtn = __super::Create(pFrameParent, pLayout, visibility);
 
 	m_Type = type;
@@ -318,5 +309,15 @@ BOOL CXScrollBar::SetRect( const CRect & rcNewFrameRect )
 VOID CXScrollBar::NotifyScrollChange()
 {
 	ThrowEvent(EVENT_SCROLLBAR_SCROLLCHANGED, m_nPos, 0);
+}
+
+INT CXScrollBar::AdjustScrollPos(INT nPos)
+{
+	if (nPos > m_nContentLen - m_nViewLen)
+		nPos = m_nContentLen - m_nViewLen;
+	if (nPos < 0)
+		nPos = 0;
+
+	return nPos;
 }
 

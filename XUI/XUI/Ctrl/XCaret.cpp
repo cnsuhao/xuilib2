@@ -77,14 +77,10 @@ BOOL CXCaret::SetCaretShape( HBITMAP hBitmap, int nWidth, int nHeight )
 	else
 		m_hBitmap = hBitmap;
 
-	LayoutParam *pLayoutPram = BeginUpdateLayoutParam();
-	ATLASSERT(pLayoutPram);
-	if (pLayoutPram)
-	{
-		pLayoutPram->m_nWidth = nWidth;
-		pLayoutPram->m_nHeight = nHeight;
-		EndUpdateLayoutParam();
-	}
+	CRect rc (GetRect());
+	rc.right = rc.left + nWidth;
+	rc.bottom = rc.top + nHeight;
+	SetRect(rc);
 
 	InvalidateRect();
 
@@ -165,12 +161,6 @@ BOOL CXCaret::PaintForeground( HDC hDC, const CRect &rcUpdate )
 BOOL CXCaret::Create( CXFrame * pFrameParent, LayoutParam *pLayout,  VISIBILITY visibility/* = VISIBILITY_NONE*/, 
 					 UINT nBlinkTime /*= 500*/)
 {
-	if (!pLayout) 
-	{
-		ATLASSERT(!_T("No layout parameter. "));
-		return FALSE;
-	}
-
 	BOOL bRtn = __super::Create(pFrameParent, pLayout, visibility);
 
 	SetCaretBlinkTime(nBlinkTime);

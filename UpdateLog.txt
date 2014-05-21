@@ -16,3 +16,11 @@ bug fix.
 v2.0.1
 ------
 Add layout system. 
+
+v2.1.0
+------
+- Bug fix.
+- Add scroll/offset mechanism to accelerate animation.
+- Add manual layout mechanism to accelerate layouting of frames of which
+  the position is changed constantly. 
+

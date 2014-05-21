@@ -24,7 +24,7 @@ CXFrame * CXDock::CreateFrameFromXML(X_XML_NODE_TYPE xml, CXFrame *pParent)
 	X_XML_ATTR_TYPE attr = NULL;
 
 	DockType eDockType = DOCK_LEFT2RIGHT;
-	Align eAlignType = ALIGN_MIDDLE;
+	Align eAlignType = ALIGN_LOW;
 	
 	attr = xml->first_attribute("dock_type", 0, false);
 	if (attr)
@@ -72,11 +72,6 @@ VOID CXDock::Destroy()
 
 BOOL CXDock::Create( CXFrame * pFrameParent, DockType dock, Align align, LayoutParam * pLayout,  VISIBILITY visibility /*= VISIBILITY_NONE*/)
 {
-	if (!pLayout) 
-	{
-		ATLASSERT(!_T("No layout parameter. "));
-		return FALSE;
-	}
 
 	BOOL bRtn = __super::Create(pFrameParent, pLayout, visibility);
 
@@ -93,13 +88,11 @@ BOOL CXDock::OnMeasureWidth( const MeasureParam & param )
 	if (m_DockType == DOCK_TOP2BOTTOM || m_DockType == DOCK_BOTTOM2TOP)
 		OnMeasureAlignDirection(param, &nMeasurd, 
 			&CXFrame::MeasureWidth, &CXFrame::GetMeasuredWidth, 
-			&LayoutParam::m_nX,
 			&LayoutParam::m_nMarginLeft, &LayoutParam::m_nMarginRight,
 			&LayoutParam::m_nWidth, &LayoutParam::m_mWidth);
 	else
 		OnMeasureLayoutDirection(param, &nMeasurd, 
 			&CXFrame::MeasureWidth, &CXFrame::GetMeasuredWidth, 
-			&LayoutParam::m_nX,
 			&LayoutParam::m_nMarginLeft, &LayoutParam::m_nMarginRight,
 			&LayoutParam::m_nWidth, &LayoutParam::m_mWidth);
 
@@ -115,13 +108,11 @@ BOOL CXDock::OnMeasureHeight( const MeasureParam & param )
 	if (m_DockType == DOCK_LEFT2RIGHT || m_DockType == DOCK_RIGHT2LEFT)
 		OnMeasureAlignDirection(param, &nMeasurd,
 			&CXFrame::MeasureHeight, &CXFrame::GetMeasuredHeight, 
-			&LayoutParam::m_nY, 
 			&LayoutParam::m_nMarginTop, &LayoutParam::m_nMarginBottom,
 			&LayoutParam::m_nHeight, &LayoutParam::m_mHeight);
 	else
 		OnMeasureLayoutDirection(param, &nMeasurd,
 			&CXFrame::MeasureHeight, &CXFrame::GetMeasuredHeight, 
-			&LayoutParam::m_nY, 
 			&LayoutParam::m_nMarginTop, &LayoutParam::m_nMarginBottom,
 			&LayoutParam::m_nHeight, &LayoutParam::m_mHeight);
 
@@ -132,7 +123,6 @@ BOOL CXDock::OnMeasureHeight( const MeasureParam & param )
 BOOL CXDock::OnMeasureAlignDirection( const MeasureParam & param, INT *pMeasuredSize, 
 									 BOOL (CXFrame::*pfChildMeasureProc)(const MeasureParam &), 
 									 INT (CXFrame::*pfChildGetMeasurdProc)(), 
-									 INT LayoutParam::*pLayoutParamPos, 
 									 INT LayoutParam::*pLayoutMarginLow, 
 									 INT LayoutParam::*pLayoutMarginHigh, 
 									 INT LayoutParam::*pnLayoutParamSize, 
@@ -140,7 +130,7 @@ BOOL CXDock::OnMeasureAlignDirection( const MeasureParam & param, INT *pMeasured
 {
 	if (!pMeasuredSize || !pfChildMeasureProc || !pfChildGetMeasurdProc ||
 		!pLayoutMarginLow || !pLayoutMarginHigh ||
-		!pLayoutParamPos || !pnLayoutParamSize || !pmLayoutParamSize)
+		!pnLayoutParamSize || !pmLayoutParamSize)
 	{
 		ATLASSERT(NULL);
 		return FALSE;
@@ -159,6 +149,8 @@ BOOL CXDock::OnMeasureAlignDirection( const MeasureParam & param, INT *pMeasured
 			ATLASSERT(NULL);
 			continue;
 		}
+		if (!pCur->NeedLayout())
+			continue;
 
 		LayoutParam *pLayoutParam = pCur->GetLayoutParam();
 		if (!pLayoutParam)
@@ -166,9 +158,6 @@ BOOL CXDock::OnMeasureAlignDirection( const MeasureParam & param, INT *pMeasured
 			ATLASSERT(NULL);
 			continue;
 		}
-
-		if (pCur->GetVisibility() == VISIBILITY_NONE)
-			continue;
 
 		if (pLayoutParam->*pmLayoutParamSize 
 			== LayoutParam::METRIC_REACH_PARENT)
@@ -225,6 +214,8 @@ BOOL CXDock::OnMeasureAlignDirection( const MeasureParam & param, INT *pMeasured
 			ATLASSERT(NULL);
 			continue;
 		}
+		if (!pCur->NeedLayout())
+			continue;
 
 		LayoutParam *pLayoutParam = pCur->GetLayoutParam();
 		if (!pLayoutParam)
@@ -232,9 +223,6 @@ BOOL CXDock::OnMeasureAlignDirection( const MeasureParam & param, INT *pMeasured
 			ATLASSERT(NULL);
 			continue;
 		}
-
-		if (pCur->GetVisibility() == VISIBILITY_NONE)
-			continue;
 
 		if (pLayoutParam->*pmLayoutParamSize 
 			!= LayoutParam::METRIC_REACH_PARENT)
@@ -255,15 +243,13 @@ BOOL CXDock::OnMeasureAlignDirection( const MeasureParam & param, INT *pMeasured
 BOOL CXDock::OnMeasureLayoutDirection( const MeasureParam & param, INT *pMeasuredSize, 
 								BOOL (CXFrame::*pfChildMeasureProc)(const MeasureParam &), 
 								INT (CXFrame::*pfChildGetMeasurdProc)(), 
-								INT LayoutParam::*pLayoutParamPos, 
 								INT LayoutParam::*pLayoutMarginLow,
 								INT LayoutParam::*pLayoutMarginHigh,
 								INT LayoutParam::*pnLayoutParamSize, 
 								LayoutParam::SPECIAL_METRICS LayoutParam::*pmLayoutParamSize)
 {
 	if (!pMeasuredSize || !pfChildMeasureProc || !pfChildGetMeasurdProc ||
-		!pLayoutMarginLow || !pLayoutMarginHigh ||
-		!pLayoutParamPos || !pnLayoutParamSize || !pmLayoutParamSize)
+		!pLayoutMarginLow || !pLayoutMarginHigh || !pnLayoutParamSize || !pmLayoutParamSize)
 	{
 		ATLASSERT(NULL);
 		return FALSE;
@@ -282,6 +268,8 @@ BOOL CXDock::OnMeasureLayoutDirection( const MeasureParam & param, INT *pMeasure
 			ATLASSERT(NULL);
 			continue;
 		}
+		if (!pCur->NeedLayout())
+			continue;
 
 		LayoutParam *pLayoutParam = pCur->GetLayoutParam();
 		if (!pLayoutParam)
@@ -290,15 +278,13 @@ BOOL CXDock::OnMeasureLayoutDirection( const MeasureParam & param, INT *pMeasure
 			continue;
 		}
 
-		if (pCur->GetVisibility() == VISIBILITY_NONE)
-			continue;
-
 		MeasureParam ParamForMeasure; 
 
 		switch (pLayoutParam->*pmLayoutParamSize)
 		{
 		case LayoutParam::METRIC_WRAP_CONTENT:
-			if (param.m_Spec == MeasureParam::MEASURE_ATMOST)
+			if (param.m_Spec == MeasureParam::MEASURE_ATMOST ||
+				param.m_Spec == MeasureParam::MEASURE_EXACT)
 			{
 				ParamForMeasure.m_Spec = MeasureParam::MEASURE_ATMOST;
 				ParamForMeasure.m_nNum = max(0, 
@@ -383,7 +369,7 @@ BOOL CXDock::OnLayout( const CRect & rcRect )
 		break;
 	case DOCK_RIGHT2LEFT:
 		nDirection = -1;
-		nCurrentPos = GetMeasuredWidth();
+		nCurrentPos = rcRect.Width();
 		pLayoutDirectionStart = &CRect::right;
 		pLayoutDirectionEnd = &CRect::left;
 		pLayoutDirectionMarginStart = &LayoutParam::m_nMarginRight;
@@ -413,7 +399,7 @@ BOOL CXDock::OnLayout( const CRect & rcRect )
 		break;
 	case DOCK_BOTTOM2TOP:
 		nDirection = -1;
-		nCurrentPos = GetMeasuredHeight();
+		nCurrentPos = rcRect.Height();
 		pLayoutDirectionStart = &CRect::bottom;
 		pLayoutDirectionEnd = &CRect::top;
 		pLayoutDirectionMarginStart = &LayoutParam::m_nMarginBottom;
@@ -437,6 +423,8 @@ BOOL CXDock::OnLayout( const CRect & rcRect )
 			ATLASSERT(NULL);
 			continue;
 		}
+		if (!pCur->NeedLayout())
+			continue;
 
 		LayoutParam *pLayoutParam = pCur->GetLayoutParam();
 		if (!pLayoutParam)
@@ -444,9 +432,6 @@ BOOL CXDock::OnLayout( const CRect & rcRect )
 			ATLASSERT(NULL);
 			continue;
 		}
-
-		if (pCur->GetVisibility() == VISIBILITY_NONE)
-			continue;
 
 		CRect rc;
 		rc.*pLayoutDirectionStart = 

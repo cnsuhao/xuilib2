@@ -176,7 +176,18 @@ BOOL CXWindow::InvalidateRect(const CRect & rect)
 	if (!IsWindow())
 		return FALSE;
 
-	m_vRectInvalidated.push_back(rect);
+	if (GetVisibility() != VISIBILITY_SHOW)
+		return FALSE;
+
+	CRect rcFrame(GetRect());
+
+	CRect rcReal(0,0,0,0);
+	rcReal.IntersectRect(CRect(0,0,rcFrame.Width(),rcFrame.Height()), rect);
+
+	if (rcReal.IsRectEmpty())
+		return FALSE;
+
+	m_vRectInvalidated.push_back(rcReal);
 
 	if (!m_bUpdateScheduled)
 	{
@@ -230,9 +241,6 @@ BOOL CXWindow::RecreateBufferDC(INT nWidth, INT nHeight )
 		return FALSE;
 
 	ReleaseBufferDC();
-
-	if (!IsWindow())
-		return FALSE;
 
 	HDC hWndDC = ::GetDC(m_hWnd);
 	m_dcBuffer = ::CreateCompatibleDC(hWndDC);
@@ -538,11 +546,12 @@ BOOL CXWindow::ConfigFrameByXML( X_XML_NODE_TYPE xml )
 
 VOID CXWindow::Destroy()
 {
+	__super::Destroy();
+
 	m_bLayoutScheduled = FALSE;
 	m_bIsLayouting = FALSE;
 	m_bUpdateScheduled = FALSE;
-
-	__super::Destroy();
+	m_vRectInvalidated.clear();
 
 	if(IsWindow())
 		DestroyWindow();

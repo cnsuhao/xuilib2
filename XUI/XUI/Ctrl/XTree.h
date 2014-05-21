@@ -21,7 +21,7 @@ public:
 
 public:
 	BOOL SetUnfold(BOOL bUnfold);
-	BOOL IsUnfold();
+	BOOL IsUnfolded();
 	BOOL SetChildItemIndent(UINT nIndent);
 
 	CXFrame * SetRootItemFrame(CXFrame *pFrame);
