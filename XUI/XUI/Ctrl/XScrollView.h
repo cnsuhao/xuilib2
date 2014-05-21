@@ -1,5 +1,6 @@
 #pragma once
-#include "d:\jxd\work\common\xuiv2\xui\xui\base\xframe.h"
+
+#include "..\Base\XFrame.h"
 
 class CXScrollView :
 	public CXFrame
