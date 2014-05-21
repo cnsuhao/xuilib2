@@ -17,7 +17,7 @@ v2.0.1
 ------
 Add layout system. 
 
-v2.1.0
+v2.2.1
 ------
 - Bug fix.
 - Add scroll/offset mechanism to accelerate animation.
